@@ -10,7 +10,7 @@ import { ReadingsExplorer } from "@/components/client/ReadingsExplorer";
 import { UsageCard } from "@/components/client/UsageCard";
 import type { ReadingRow } from "@/components/ReadingsTable";
 import { buildServiceSummary, formatDay, openIssueIds, unitTitle } from "@/lib/clientReport";
-import type { FeatureStatus } from "@/lib/features";
+import { HISTORY_FEATURE, type FeatureStatus } from "@/lib/features";
 
 export interface ClientDashboardProps {
   propertyName: string;
@@ -68,6 +68,7 @@ export function ClientDashboard({
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("readings");
   const hasInsights = featureStatuses.usage_insights === "active";
+  const hasHistory = featureStatuses[HISTORY_FEATURE] === "active";
   const openIds = useMemo(() => openIssueIds(rows), [rows]);
   const summaries = useMemo(
     () => (["electricity", "water"] as const).map((s) => buildServiceSummary(rows, s)).filter((s) => s.latest),
@@ -197,7 +198,14 @@ export function ClientDashboard({
               </button>
             )}
 
-            <ReadingsExplorer propertyName={propertyName} clientName={clientName} rows={rows} openIds={openIds} />
+            <ReadingsExplorer
+              propertyName={propertyName}
+              clientName={clientName}
+              rows={rows}
+              openIds={openIds}
+              canSeeHistory={hasHistory}
+              onAskForHistory={() => show("addons")}
+            />
           </>
         )}
 

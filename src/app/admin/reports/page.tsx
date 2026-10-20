@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getProfile } from "@/lib/auth";
 import { buildReportRows } from "@/lib/report";
+import { latestMonthKey } from "@/lib/clientReport";
 import { isEmailConfigured } from "@/lib/email/brevo";
 import { ReadingsTable } from "@/components/ReadingsTable";
 import { ReportControls } from "@/components/ReportControls";
@@ -21,6 +22,7 @@ export default async function AdminReportsPage({
 }: {
   searchParams: Promise<{
     property?: string;
+    all?: string;
     from?: string;
     to?: string;
     unit?: string;
@@ -31,8 +33,8 @@ export default async function AdminReportsPage({
   if (!profile) redirect("/login?next=/admin/reports");
   if (profile.role !== "admin") redirect("/client");
 
-  const { property: selectedPropertyId, from, to, unit, service } = await searchParams;
-  const hasFilters = !!(from || to || unit || service);
+  const { property: selectedPropertyId, from, to, unit, service, all } = await searchParams;
+  const hasFilters = !!(from || to || unit || service || all);
 
   const supabase = await createClient();
   const { data: propertyRows } = await supabase.from("properties").select("*").order("name");
@@ -59,6 +61,7 @@ export default async function AdminReportsPage({
         })
       : [];
 
+  const latestMonthWithReadings = latestMonthKey(dashboardRows);
   const readingRows = dashboardRows.filter((r) => r.kind !== "replacement");
   const flaggedRows = readingRows.filter((r) => r.flag_status !== "ok");
 
@@ -162,7 +165,7 @@ export default async function AdminReportsPage({
         {activeProperty && (
           <section className="flex flex-col gap-3">
             <h2 className="no-print text-lg font-extrabold text-navy-900">Find readings</h2>
-            <ReportControls hasResults={rows.length > 0} />
+            <ReportControls hasResults={rows.length > 0} latestMonth={latestMonthWithReadings} />
             <ReadingsTable rows={rows} />
           </section>
         )}

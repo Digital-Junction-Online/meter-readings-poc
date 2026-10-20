@@ -37,7 +37,7 @@ export const ADD_ONS: AddOn[] = [
       "A dial showing this month against a usual month",
       "Six months of history, so you can spot a creep early",
     ],
-    priceRand: 79,
+    priceRand: 49,
     available: true,
   },
   {
@@ -61,7 +61,7 @@ export const ADD_ONS: AddOn[] = [
       "Queries stay attached to the reading they're about",
       "Replies within one working day",
     ],
-    priceRand: 99,
+    priceRand: 49,
     available: false,
   },
   {
@@ -73,22 +73,29 @@ export const ADD_ONS: AddOn[] = [
       "Monthly cost per unit, ready to recover",
       "Tariff increases applied from the date they take effect",
     ],
-    priceRand: 149,
+    priceRand: 49,
     available: false,
   },
   {
     key: "history_export",
-    name: "Full history & exports",
-    tagline: "Every reading ever taken, downloadable",
+    name: "Past readings",
+    tagline: "Look back further than this month",
     bullets: [
-      "History beyond the last twelve months",
-      "Download as a spreadsheet for your accountant",
-      "Meter photos included in the export",
+      "Filter by last 3 months, 6 months, or everything",
+      "Compare a unit against the same month last year",
+      "Download any period as a PDF, not just the current one",
     ],
-    priceRand: 39,
-    available: false,
+    priceRand: 49,
+    available: true,
   },
 ];
+
+/**
+ * Without the past-readings add-on a client sees the latest month only.
+ * Everything older is still theirs — it just isn't on the dashboard until
+ * they take the add-on.
+ */
+export const HISTORY_FEATURE: FeatureKey = "history_export";
 
 export const ADD_ON_BY_KEY: Record<string, AddOn> = Object.fromEntries(
   ADD_ONS.map((a) => [a.key, a])

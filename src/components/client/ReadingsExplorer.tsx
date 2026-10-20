@@ -35,16 +35,22 @@ export function ReadingsExplorer({
   clientName,
   rows,
   openIds,
+  canSeeHistory = true,
+  onAskForHistory,
 }: {
   propertyName: string;
   /** Who the downloaded report is prepared for; the property name if unknown. */
   clientName?: string | null;
   rows: ReadingRow[];
   openIds: Set<string>;
+  /** False locks the period picker to the latest month (past-readings add-on). */
+  canSeeHistory?: boolean;
+  onAskForHistory?: () => void;
 }) {
   const [query, setQuery] = useState("");
   const [service, setService] = useState<Service | "all">("all");
   const [period, setPeriod] = useState<PeriodKey>("latest");
+  const effectivePeriod: PeriodKey = canSeeHistory ? period : "latest";
   const [sort, setSort] = useState<SortKey>("unit-asc");
   const [visible, setVisible] = useState(PAGE_SIZE);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -56,12 +62,14 @@ export function ReadingsExplorer({
 
   const latestKey = useMemo(() => latestMonthKey(rows), [rows]);
   const results = useMemo(
-    () => filterReadings(rows, { query, service, period, sort, latestKey }),
-    [rows, query, service, period, sort, latestKey]
+    // Pinned server-side-of-the-UI rather than trusting the select: without
+    // the add-on the only period that can be in effect is the latest month.
+    () => filterReadings(rows, { query, service, period: effectivePeriod, sort, latestKey }),
+    [rows, query, service, effectivePeriod, sort, latestKey]
   );
 
   const openRow = openId ? (results.find((r) => r.id === openId) ?? rows.find((r) => r.id === openId) ?? null) : null;
-  const period_ = periodLabel(period, latestKey);
+  const period_ = periodLabel(effectivePeriod, latestKey);
   const hasFilters = query.trim() !== "" || service !== "all";
 
   function change(update: () => void) {
@@ -162,11 +170,14 @@ export function ReadingsExplorer({
             <select
               value={period}
               onChange={(e) => change(() => setPeriod(e.target.value as PeriodKey))}
-              className={`${controlClass} w-full`}
+              disabled={!canSeeHistory}
+              title={canSeeHistory ? undefined : "Past readings is an add-on"}
+              className={`${controlClass} w-full disabled:cursor-not-allowed disabled:opacity-60`}
             >
               {PERIOD_OPTIONS.map((o) => (
-                <option key={o.key} value={o.key}>
+                <option key={o.key} value={o.key} disabled={!canSeeHistory && o.key !== "latest"}>
                   {o.label}
+                  {!canSeeHistory && o.key !== "latest" ? " — add-on" : ""}
                 </option>
               ))}
             </select>
@@ -187,6 +198,24 @@ export function ReadingsExplorer({
           </label>
         </div>
       </div>
+
+      {!canSeeHistory && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-surface px-4 py-3">
+          <p className="min-w-0 text-sm text-text-body">
+            You&rsquo;re seeing {period_}. <strong className="text-navy-900">Past readings</strong> opens up the
+            last 3 months, 6 months, or everything.
+          </p>
+          {onAskForHistory && (
+            <button
+              type="button"
+              onClick={onAskForHistory}
+              className="min-h-11 shrink-0 rounded-xl border-[1.5px] border-border-strong px-4 text-sm font-bold text-navy-700 hover:bg-app-bg"
+            >
+              See add-ons
+            </button>
+          )}
+        </div>
+      )}
 
       {!showList ? (
         <div className="flex flex-col items-center gap-3 rounded-2xl border-2 border-dashed border-border px-4 py-10 text-center">
