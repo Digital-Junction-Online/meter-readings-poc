@@ -18,7 +18,7 @@ const NOTIFY = "support@wmfixandfinish.co.za";
 export async function requestFeature(
   clientId: string,
   featureKey: string
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<{ ok: boolean; error?: string; warning?: string }> {
   const profile = await getProfile();
   if (!profile) return { ok: false, error: "Please sign in again." };
   if (!isFeatureKey(featureKey)) return { ok: false, error: "Unknown add-on." };
@@ -27,6 +27,7 @@ export async function requestFeature(
   const user = await getSessionUser();
   const supabase = await createClient();
   const requestedAt = new Date().toISOString();
+  let emailWarning: string | undefined;
 
   // Deliberately not an upsert. PostgREST turns upsert into
   // INSERT ... ON CONFLICT DO UPDATE SET <every column>, and Postgres checks
@@ -83,12 +84,24 @@ export async function requestFeature(
             </p>
           </div>`,
       });
-    } catch {
-      // Swallowed deliberately — see comment above.
+    } catch (err) {
+      // The request is saved either way, so this must not fail the action —
+      // but it must not vanish either: a silent failure here means Wayne
+      // never hears about a request the client thinks he received.
+      emailWarning =
+        err instanceof Error && /unrecognised ip|unauthorized/i.test(err.message)
+          ? "Saved, but the notification email was blocked by Brevo's IP allowlist. Wayne can still see this under Admin → Add-ons."
+          : "Saved, but we couldn't send the notification email. Wayne can still see this under Admin → Add-ons.";
+      console.error("Add-on request notification failed:", err);
     }
+  } else {
+    // No key on this deployment. The request is saved, but nobody is told, so
+    // say so rather than promising "Wayne will be in touch".
+    emailWarning =
+      "Saved, but email isn't set up on the server, so Wayne wasn't notified. He can still see this under Admin → Add-ons.";
   }
 
   revalidatePath("/client");
   revalidatePath("/admin/add-ons");
-  return { ok: true };
+  return { ok: true, warning: emailWarning };
 }

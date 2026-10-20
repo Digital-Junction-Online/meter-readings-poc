@@ -27,14 +27,19 @@ export function AddOnAdminList({ rows }: { rows: AddOnRow[] }) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
-  function run(key: string, fn: () => Promise<void>) {
+  function run(key: string, fn: () => Promise<{ warning?: string } | void>) {
     setError(null);
+    setNotice(null);
     setBusy(key);
     startTransition(async () => {
       try {
-        await fn();
+        const result = await fn();
+        // Switching on succeeds even if the "it's live" email doesn't — say so
+        // rather than letting the client wonder why they were never told.
+        if (result?.warning) setNotice(result.warning);
         router.refresh();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Something went wrong");
@@ -118,6 +123,12 @@ export function AddOnAdminList({ rows }: { rows: AddOnRow[] }) {
       {error && (
         <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
           {error}
+        </p>
+      )}
+
+      {notice && (
+        <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
+          {notice}
         </p>
       )}
 

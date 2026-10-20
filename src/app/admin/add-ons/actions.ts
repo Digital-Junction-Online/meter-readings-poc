@@ -7,11 +7,15 @@ import { ADD_ON_BY_KEY, formatRand, isFeatureKey } from "@/lib/features";
 import { isEmailConfigured, sendEmail } from "@/lib/email/brevo";
 
 /** Switches a paid add-on on for a client, and tells them it's live. */
-export async function activateFeature(clientId: string, featureKey: string) {
+export async function activateFeature(
+  clientId: string,
+  featureKey: string
+): Promise<{ warning?: string }> {
   const admin = await requireAdmin();
   if (!isFeatureKey(featureKey)) throw new Error("Unknown add-on.");
   const addOn = ADD_ON_BY_KEY[featureKey];
   const supabase = await createClient();
+  let warning: string | undefined;
 
   const { error } = await supabase
     .from("client_features")
@@ -46,13 +50,22 @@ export async function activateFeature(clientId: string, featureKey: string) {
             <p style="margin:0;color:#64748b;font-size:13px;">Billed at ${formatRand(addOn.priceRand)} per month.</p>
           </div>`,
       });
-    } catch {
-      // Swallowed deliberately — see comment above.
+    } catch (err) {
+      // The add-on is already live, so this cannot fail the action — but it
+      // must not disappear either, or the client is never told it's on.
+      warning = `Switched on, but we couldn't email ${client.contact_email}.`;
+      console.error("Add-on activation email failed:", err);
     }
+  } else if (client?.contact_email) {
+    warning = `Switched on, but email isn't set up on the server, so ${client.contact_email} wasn't told.`;
+  } else {
+    warning =
+      "Switched on. This client has no contact email, so they weren't told — you can add one under Clients & properties.";
   }
 
   revalidatePath("/admin/add-ons");
   revalidatePath("/client");
+  return { warning };
 }
 
 /** Turns an add-on off, or declines a request that isn't going ahead. */
