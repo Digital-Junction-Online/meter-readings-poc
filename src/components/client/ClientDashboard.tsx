@@ -7,6 +7,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { AlertsFeed } from "@/components/AlertsFeed";
 import { AddOnsPanel } from "@/components/client/AddOnsPanel";
 import { ReadingsExplorer } from "@/components/client/ReadingsExplorer";
+import { UnitInsights } from "@/components/client/UnitInsights";
 import { UsageCard } from "@/components/client/UsageCard";
 import type { ReadingRow } from "@/components/ReadingsTable";
 import { buildServiceSummary, formatDay, openIssueIds, unitTitle } from "@/lib/clientReport";
@@ -67,6 +68,8 @@ export function ClientDashboard({
 }: ClientDashboardProps) {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("readings");
+  /** Set when a unit is tapped in Insights, to pre-filter the readings list. */
+  const [unitFilter, setUnitFilter] = useState("");
   const hasInsights = featureStatuses.usage_insights === "active";
   const hasHistory = featureStatuses[HISTORY_FEATURE] === "active";
   const openIds = useMemo(() => openIssueIds(rows), [rows]);
@@ -97,6 +100,13 @@ export function ClientDashboard({
     { key: "addons", label: "Add-ons", icon: <AddOnsIcon /> },
   ];
 
+  /** Nav taps clear a unit filter set from Insights, so the readings list
+   *  never opens silently narrowed to one unit. */
+  function goTo(next: Tab) {
+    setUnitFilter("");
+    show(next);
+  }
+
   function show(next: Tab) {
     setTab(next);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -113,7 +123,7 @@ export function ClientDashboard({
                 <button
                   key={t.key}
                   type="button"
-                  onClick={() => show(t.key)}
+                  onClick={() => goTo(t.key)}
                   aria-current={tab === t.key ? "page" : undefined}
                   className={`flex min-h-11 items-center gap-2 rounded-[10px] px-3.5 text-[15px] ${
                     tab === t.key ? "bg-white/[0.12] font-bold text-white" : "font-semibold text-white/80 hover:bg-white/[0.06] hover:text-white"
@@ -199,12 +209,16 @@ export function ClientDashboard({
             )}
 
             <ReadingsExplorer
+              // Remounting is how a unit tapped in Insights pre-fills the
+              // search, without an effect syncing two copies of the query.
+              key={`readings-${unitFilter}`}
               propertyName={propertyName}
               clientName={clientName}
               rows={rows}
               openIds={openIds}
               canSeeHistory={hasHistory}
               onAskForHistory={() => show("addons")}
+              initialQuery={unitFilter}
             />
           </>
         )}
@@ -216,11 +230,26 @@ export function ClientDashboard({
               <p className="text-sm text-[#5d6c80]">How {propertyName} is using electricity and water</p>
             </div>
             {summaries.length > 0 ? (
-              <div className={`grid grid-cols-1 gap-4 ${summaries.length > 1 ? "md:grid-cols-2" : ""}`}>
-                {summaries.map((s) => (
-                  <UsageCard key={s.service} summary={s} />
-                ))}
-              </div>
+              <>
+                <div className={`grid grid-cols-1 gap-4 ${summaries.length > 1 ? "md:grid-cols-2" : ""}`}>
+                  {summaries.map((s) => (
+                    <UsageCard key={s.service} summary={s} />
+                  ))}
+                </div>
+                <div className={`grid grid-cols-1 gap-4 ${summaries.length > 1 ? "md:grid-cols-2" : ""}`}>
+                  {summaries.map((s) => (
+                    <UnitInsights
+                      key={s.service}
+                      rows={rows}
+                      summary={s}
+                      onOpenUnit={(unitNumber) => {
+                        setUnitFilter(unitNumber);
+                        show("readings");
+                      }}
+                    />
+                  ))}
+                </div>
+              </>
             ) : (
               <p className="rounded-2xl border border-border bg-surface px-4 py-6 text-center text-[15px] text-text-body">
                 Your usage will show here after the first two meter rounds.
@@ -257,7 +286,7 @@ export function ClientDashboard({
           <button
             key={t.key}
             type="button"
-            onClick={() => show(t.key)}
+            onClick={() => goTo(t.key)}
             aria-current={tab === t.key ? "page" : undefined}
             className={`flex min-h-12 flex-col items-center justify-center gap-1 text-xs ${
               tab === t.key ? "font-bold text-navy-700" : "font-semibold text-[#5d6c80]"

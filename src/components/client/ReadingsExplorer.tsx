@@ -37,6 +37,7 @@ export function ReadingsExplorer({
   openIds,
   canSeeHistory = true,
   onAskForHistory,
+  initialQuery = "",
 }: {
   propertyName: string;
   /** Who the downloaded report is prepared for; the property name if unknown. */
@@ -46,8 +47,11 @@ export function ReadingsExplorer({
   /** False locks the period picker to the latest month (past-readings add-on). */
   canSeeHistory?: boolean;
   onAskForHistory?: () => void;
+  /** Pre-filters the list, e.g. when a unit was tapped in Insights. The
+   *  component is remounted with a new key to change it. */
+  initialQuery?: string;
 }) {
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(initialQuery);
   const [service, setService] = useState<Service | "all">("all");
   const [period, setPeriod] = useState<PeriodKey>("latest");
   const effectivePeriod: PeriodKey = canSeeHistory ? period : "latest";
@@ -58,7 +62,7 @@ export function ReadingsExplorer({
   const [pdfError, setPdfError] = useState<string | null>(null);
   // The list stays hidden until the client asks for something — a full
   // property's readings is a long scroll that buries what they came for.
-  const [showList, setShowList] = useState(false);
+  const [showList, setShowList] = useState(initialQuery !== "");
 
   const latestKey = useMemo(() => latestMonthKey(rows), [rows]);
   const results = useMemo(
