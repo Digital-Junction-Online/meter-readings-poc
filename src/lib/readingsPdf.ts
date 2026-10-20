@@ -109,7 +109,7 @@ function drawHeader(doc: Doc, logo: string | null): number {
   doc.setTextColor(255, 255, 255);
   doc.text("WAYNE'S", x, 40);
   setText(doc, BRIGHT_GREEN);
-  doc.text("FIX AND FINISH", x + doc.getTextWidth("WAYNE'S") + 4, 40);
+  doc.text("METER READINGS", x + doc.getTextWidth("WAYNE'S") + 4, 40);
 
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(21);

@@ -75,7 +75,7 @@ export default async function Home() {
 
         <div className="mt-7">
           <p className="text-sm font-bold uppercase tracking-[0.08em]">
-            <span className="text-white">Wayne&apos;s</span> <span className="text-[#6cc04a]">Fix and Finish</span>
+            <span className="text-white">Wayne&apos;s</span> <span className="text-[#6cc04a]">Meter Readings</span>
           </p>
           <h1 className="mt-2.5 text-[34px] font-extrabold leading-[1.1] tracking-tight lg:text-5xl">
             {firstName ? (

@@ -121,16 +121,36 @@ export function UsageTrendChart({
 
   // The value pill above the latest month.
   const renderPill = (raw: unknown) => {
-    const props = raw as { x?: number | string; y?: number | string; width?: number | string; value?: number | string; index?: number };
+    const props = raw as {
+      x?: number | string;
+      y?: number | string;
+      width?: number | string;
+      value?: number | string;
+      index?: number;
+      /** The plot area, which recharts passes down with every label. */
+      parentViewBox?: { x?: number; width?: number };
+    };
     if (props.index !== lastIndex) return null;
-    const x = Number(props.x ?? 0) + Number(props.width ?? 0) / 2;
     const y = Number(props.y ?? 0);
     const text = Number(props.value ?? 0).toLocaleString("en-US");
     const w = text.length * 7 + 16;
+
+    // The latest month sits hard against the right edge, so centring a wide
+    // value on it pushes half the pill outside the SVG, where it's clipped.
+    // Keep it inside the plot area and let it sit off-centre instead.
+    const centre = Number(props.x ?? 0) + Number(props.width ?? 0) / 2;
+    const plot = props.parentViewBox;
+    const plotLeft = plot?.x ?? 0;
+    const plotRight = plot?.width != null ? plotLeft + plot.width : null;
+    let left = centre - w / 2;
+    if (plotRight !== null) left = Math.min(left, plotRight - w);
+    left = Math.max(left, plotLeft);
+    const textX = left + w / 2;
+
     return (
       <g>
-        <rect x={x - w / 2} y={y - 26} width={w} height={20} rx={10} fill={dark ? "#ffffff" : "#0c1f3d"} />
-        <text x={x} y={y - 12} textAnchor="middle" fontSize={11} fontWeight={700} fontFamily="var(--font-jetbrains-mono)" fill={dark ? "#0c1f3d" : "#ffffff"}>
+        <rect x={left} y={y - 26} width={w} height={20} rx={10} fill={dark ? "#ffffff" : "#0c1f3d"} />
+        <text x={textX} y={y - 12} textAnchor="middle" fontSize={11} fontWeight={700} fontFamily="var(--font-jetbrains-mono)" fill={dark ? "#0c1f3d" : "#ffffff"}>
           {text}
         </text>
       </g>
