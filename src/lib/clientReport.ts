@@ -315,3 +315,151 @@ export function filterReadings(
   });
   return matches;
 }
+
+// --------------------------------------------------- per-unit insight
+//
+// Everything below works off the rows already on the page, which are one
+// property's readings. A "unit" here is a unit of that property — these
+// figures never reach across to another client's property.
+
+/** Usage this many times a unit's own history is a mistyped digit, not real. */
+const SUSPECT_MULTIPLE = 20;
+/** How far off its own usual a unit has to be before it counts as a mover. */
+const MOVER_RATIO_UP = 1.4;
+const MOVER_RATIO_DOWN = 0.6;
+/** A sustained rise this far above usual is worth someone walking the pipes. */
+const LEAK_RATIO = 1.5;
+
+export interface UnitInsight {
+  unitNumber: string;
+  /** "Unit 14", or the meter's own name for communal meters. */
+  label: string;
+  months: { key: string; usage: number }[];
+  /** Usage in the month being reported on; null if this unit wasn't read. */
+  latest: number | null;
+  /** This unit's own usual month, averaged over up to six months before. */
+  typical: number | null;
+  /** latest ÷ typical. 1 is an ordinary month for this unit. */
+  ratio: number | null;
+  /** latest − typical, in kWh or kL — how much of the change this unit is. */
+  delta: number | null;
+  /** This unit's share of the property's total for the month, 0–1. */
+  share: number;
+  /** Beyond anything this unit has ever done, so almost certainly a typo.
+   *  Left out of the rankings rather than shown as a real number. */
+  suspect: boolean;
+}
+
+/**
+ * Per-unit usage for one service, for the month given. Built from the same
+ * rows the dashboard already holds, so it adds no new data — it just stops
+ * throwing the per-unit detail away when totalling the property.
+ */
+export function buildUnitInsights(
+  rows: ReadingRow[],
+  service: Service,
+  latestKey: string
+): UnitInsight[] {
+  const byUnit = new Map<string, Map<string, number>>();
+  for (const r of rows) {
+    if (r.kind === "replacement" || r.service !== service) continue;
+    if (r.usage === null || r.usage < 0) continue;
+    const key = monthKey(r.captured_at);
+    if (key > latestKey) continue;
+    const months = byUnit.get(r.unit_number) ?? new Map<string, number>();
+    months.set(key, (months.get(key) ?? 0) + r.usage);
+    byUnit.set(r.unit_number, months);
+  }
+
+  const insights: UnitInsight[] = [];
+  for (const [unitNumber, monthMap] of byUnit) {
+    const months = [...monthMap.entries()]
+      .map(([key, usage]) => ({ key, usage }))
+      .sort((a, b) => a.key.localeCompare(b.key));
+    const latest = monthMap.get(latestKey) ?? null;
+
+    // The unit's own baseline — its six months before this one. Comparing a
+    // unit against itself rather than against the property average is what
+    // makes this fair: a four-bedroom unit is meant to use more.
+    const prior = months.filter((m) => m.key < latestKey).slice(-6);
+    const typical = prior.length > 0 ? prior.reduce((sum, m) => sum + m.usage, 0) / prior.length : null;
+    const ratio = latest !== null && typical && typical > 0 ? latest / typical : null;
+
+    insights.push({
+      unitNumber,
+      label: unitTitle(unitNumber),
+      months,
+      latest,
+      typical,
+      ratio,
+      delta: latest !== null && typical !== null ? latest - typical : null,
+      share: 0,
+      suspect: ratio !== null && ratio >= SUSPECT_MULTIPLE,
+    });
+  }
+
+  // Share is of the believable total, so one mistyped reading can't make every
+  // other unit look like it used nothing.
+  const total = insights
+    .filter((u) => !u.suspect)
+    .reduce((sum, u) => sum + (u.latest ?? 0), 0);
+  if (total > 0) {
+    for (const u of insights) {
+      if (!u.suspect && u.latest !== null) u.share = u.latest / total;
+    }
+  }
+
+  return insights.sort((a, b) => (b.latest ?? 0) - (a.latest ?? 0));
+}
+
+/** The heaviest users this month, largest first. */
+export function topUsers(insights: UnitInsight[], limit = 6): UnitInsight[] {
+  return insights.filter((u) => !u.suspect && u.latest !== null && u.latest > 0).slice(0, limit);
+}
+
+/**
+ * Units furthest from their own usual, ranked by how much of the property's
+ * change they actually account for — on a 50-unit property a 20% jump is
+ * normally two or three meters, not everyone.
+ */
+export function biggestMovers(insights: UnitInsight[], limit = 4): UnitInsight[] {
+  return insights
+    .filter(
+      (u) =>
+        !u.suspect &&
+        u.ratio !== null &&
+        u.delta !== null &&
+        (u.ratio >= MOVER_RATIO_UP || u.ratio <= MOVER_RATIO_DOWN)
+    )
+    .sort((a, b) => Math.abs(b.delta ?? 0) - Math.abs(a.delta ?? 0))
+    .slice(0, limit);
+}
+
+/**
+ * Units worth physically checking: usage well above their own usual, and
+ * still up the month before, which is what a running toilet or a leaking
+ * pipe looks like on monthly readings. A single high month is just a busy
+ * month, so it deliberately doesn't qualify.
+ */
+export function possibleLeaks(insights: UnitInsight[], latestKey: string): UnitInsight[] {
+  return insights
+    .filter((u) => {
+      if (u.suspect || u.ratio === null || u.ratio < LEAK_RATIO || u.typical === null) return false;
+      const prevKey = shiftMonthKey(latestKey, -1);
+      const prev = u.months.find((m) => m.key === prevKey);
+      // Needs the month before to be raised too — one month is not a pattern.
+      return !!prev && u.typical > 0 && prev.usage / u.typical >= LEAK_RATIO;
+    })
+    .sort((a, b) => (b.delta ?? 0) - (a.delta ?? 0));
+}
+
+/** "uses about a fifth of the property's water" — share as plain words. */
+export function sharePct(share: number): string {
+  return `${Math.round(share * 100)}%`;
+}
+
+/** "2.3× its usual" / "a third of its usual" */
+export function ratioPhrase(ratio: number): string {
+  if (ratio >= 1) return `${ratio.toFixed(1).replace(/\.0$/, "")}× its usual`;
+  return `${Math.round(ratio * 100)}% of its usual`;
+}

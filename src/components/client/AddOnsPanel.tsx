@@ -27,12 +27,14 @@ export function AddOnsPanel({
   const router = useRouter();
   const [pendingKey, setPendingKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
   function request(key: string) {
     if (!clientId || !canRequest) return;
     haptic("tap");
     setError(null);
+    setNotice(null);
     setPendingKey(key);
     startTransition(async () => {
       try {
@@ -41,6 +43,7 @@ export function AddOnsPanel({
         // client nothing and leaves no trace of what actually went wrong.
         const result = await requestFeature(clientId, key);
         if (result.ok) {
+          setNotice(result.warning ?? "Request sent. Wayne will be in touch to invoice you.");
           router.refresh();
         } else {
           haptic("error");
@@ -68,6 +71,12 @@ export function AddOnsPanel({
       {error && (
         <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
           {error}
+        </p>
+      )}
+
+      {notice && (
+        <p role="status" className="rounded-xl border border-[#b9dcaa] bg-[#e6f2df] px-4 py-3 text-sm font-medium text-[#2e6b1d]">
+          {notice}
         </p>
       )}
 
