@@ -6,6 +6,7 @@ import { ClientDashboard } from "@/components/client/ClientDashboard";
 import { LogoutButton } from "@/components/LogoutButton";
 import { GaugeIcon } from "@/components/icons";
 import type { Property } from "@/lib/types";
+import type { FeatureStatus } from "@/lib/features";
 
 export const dynamic = "force-dynamic";
 
@@ -40,11 +41,19 @@ export default async function ClientPage({
   }
 
   const active = properties.find((p) => p.id === selectedPropertyId) ?? properties[0];
-  const [rows, { data: clientRow }] = await Promise.all([
+  const [rows, { data: clientRow }, { data: featureRows }] = await Promise.all([
     buildReportRows(active.id),
     // RLS lets a client user read only their own client record.
     supabase.from("clients").select("name").eq("id", active.client_id).maybeSingle(),
+    supabase.from("client_features").select("feature_key, status").eq("client_id", active.client_id),
   ]);
+
+  const featureStatuses = Object.fromEntries(
+    ((featureRows ?? []) as { feature_key: string; status: FeatureStatus }[]).map((f) => [
+      f.feature_key,
+      f.status,
+    ])
+  );
 
   return (
     <ClientDashboard
@@ -57,6 +66,8 @@ export default async function ClientPage({
       greetingName={profile.full_name}
       clientName={(clientRow as { name: string } | null)?.name ?? null}
       rows={rows}
+      clientId={active.client_id}
+      featureStatuses={featureStatuses}
     />
   );
 }

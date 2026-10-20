@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { acceptReading, editReading } from "@/app/admin/review/actions";
-import { createClient } from "@/lib/supabase/browser";
+import { uploadReadingPhoto } from "@/lib/readingPhoto";
 import { formatDateTime } from "@/lib/date";
 import { haptic } from "@/lib/haptics";
 import { BAND_META, BAND_ORDER, triageReading, type TriageBand } from "@/lib/triage";
@@ -30,20 +30,6 @@ export interface ReviewItem {
   capturedAt: string;
   photoUrl: string | null;
   notes: string | null;
-}
-
-// Module-level, not a component-body closure: Date.now() here is an event
-// callback's concern, not render's, but the purity lint can't tell the two
-// apart once a function is nested inside a component — keeping it top-level
-// sidesteps that.
-async function uploadEditPhoto(readingId: string, file: File): Promise<string> {
-  const supabase = createClient();
-  const ext = file.name.split(".").pop() || "jpg";
-  const path = `review-edits/${readingId}-${Date.now()}.${ext}`;
-  const { error: uploadError } = await supabase.storage.from("meter-photos").upload(path, file);
-  if (uploadError) throw new Error(`Photo upload failed: ${uploadError.message}`);
-  const { data: publicUrlData } = supabase.storage.from("meter-photos").getPublicUrl(path);
-  return publicUrlData.publicUrl;
 }
 
 export function ReviewQueueList({ items }: { items: ReviewItem[] }) {
@@ -121,7 +107,7 @@ export function ReviewQueueList({ items }: { items: ReviewItem[] }) {
     haptic("success");
     setSavingEdit(true);
     try {
-      const photoUrl = editPhoto ? await uploadEditPhoto(readingId, editPhoto) : undefined;
+      const photoUrl = editPhoto ? await uploadReadingPhoto(readingId, editPhoto) : undefined;
       await editReading({ readingId, rawValue: editValue, notes: editNotes.trim() || null, photoUrl });
       cancelEdit();
       router.refresh();

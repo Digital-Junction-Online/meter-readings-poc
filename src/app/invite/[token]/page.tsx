@@ -95,7 +95,7 @@ export default function InvitePage({ params }: { params: Promise<{ token: string
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center bg-white px-5 py-6">
       <div className="mb-6 flex flex-col items-center text-center">
-        <Image src="/icons/source-icon.png" alt="Wayne's Fix & Finish logo" width={72} height={72} className="rounded-[18px]" priority />
+        <Image src="/icons/source-icon.png" alt="Wayne's Meter Readings logo" width={72} height={72} className="rounded-[18px]" priority />
         <h1 className="mt-4 text-[26px] font-extrabold text-navy-900">You&apos;ve been invited</h1>
         <p className="mt-1.5 text-[15px] leading-relaxed text-text-body">
           Create an account to view reports for <strong>{preview.client_name}</strong>.

@@ -23,11 +23,11 @@ export const metadata: Metadata = {
   // so WhatsApp/email previews show our logo rather than a Vercel default.
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://app.wmfixandfinish.co.za"),
   title: "Meter Readings",
-  description: "Wayne's Fix & Finish meter readings",
+  description: "Electricity and water meter readings for your property.",
   openGraph: {
-    title: "Meter Readings · Wayne's Fix & Finish",
+    title: "WM — Wayne's Meter Readings",
     description: "Electricity and water meter readings for your property.",
-    siteName: "Meter Readings",
+    siteName: "WM — Wayne's Meter Readings",
     type: "website",
   },
   manifest: "/manifest.webmanifest",

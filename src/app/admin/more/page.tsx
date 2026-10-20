@@ -23,6 +23,11 @@ const ICONS = {
       <path d="M9 12h7M9 16h5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
     </svg>
   ),
+  addOns: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+    </svg>
+  ),
   users: (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <circle cx="9" cy="8" r="3.2" stroke="currentColor" strokeWidth="2" />
@@ -76,10 +81,10 @@ export default async function AdminMenuPage() {
   if (profile.role !== "admin") redirect("/client");
 
   const [user, supabase] = await Promise.all([getSessionUser(), createClient()]);
-  const { count: linkedClients } = await supabase
-    .from("clients")
-    .select("id", { count: "exact", head: true })
-    .not("rebill_client_id", "is", null);
+  const [{ count: linkedClients }, { count: pendingAddOns }] = await Promise.all([
+    supabase.from("clients").select("id", { count: "exact", head: true }).not("rebill_client_id", "is", null),
+    supabase.from("client_features").select("id", { count: "exact", head: true }).eq("status", "requested"),
+  ]);
 
   const name = profile.full_name?.trim() || "Admin";
 
@@ -105,6 +110,14 @@ export default async function AdminMenuPage() {
               icon: ICONS.quotes,
               label: "Quotes",
               sub: `Build and send quotes through Rebill${linkedClients ? ` · ${linkedClients} client${linkedClients === 1 ? "" : "s"} linked` : ""}`,
+            },
+            {
+              href: "/admin/add-ons",
+              icon: ICONS.addOns,
+              label: "Add-ons",
+              sub: pendingAddOns
+                ? `${pendingAddOns} request${pendingAddOns === 1 ? "" : "s"} waiting on payment`
+                : "Paid extras clients have asked for",
             },
           ]}
         />

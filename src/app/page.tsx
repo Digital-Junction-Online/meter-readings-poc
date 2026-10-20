@@ -66,7 +66,7 @@ export default async function Home() {
       <div className="relative mx-auto flex w-full max-w-md flex-1 flex-col px-6 pb-8 pt-12 lg:max-w-xl lg:justify-center">
         <Image
           src="/icons/source-icon.png"
-          alt="Wayne's Fix & Finish logo"
+          alt="Wayne's Meter Readings logo"
           width={96}
           height={96}
           priority

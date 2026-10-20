@@ -4,7 +4,7 @@
 
 const BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
 const FROM_EMAIL = "support@wmfixandfinish.co.za";
-const FROM_NAME = "Wayne's Fix & Finish";
+const FROM_NAME = "Wayne's Meter Readings";
 
 export function isEmailConfigured(): boolean {
   return !!process.env.BREVO_API_KEY;

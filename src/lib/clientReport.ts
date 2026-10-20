@@ -226,7 +226,16 @@ export function buildServiceSummary(rows: ReadingRow[], service: Service): Servi
 // --------------------------------------------------------------- filtering
 
 export type PeriodKey = "latest" | "3m" | "6m" | "all";
-export type SortKey = "newest" | "unit";
+
+/** What the list is ordered by, and which way. */
+export type SortKey = "unit-asc" | "unit-desc" | "reading-asc" | "reading-desc";
+
+export const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+  { key: "unit-asc", label: "Unit number (low to high)" },
+  { key: "unit-desc", label: "Unit number (high to low)" },
+  { key: "reading-asc", label: "Reading (low to high)" },
+  { key: "reading-desc", label: "Reading (high to low)" },
+];
 
 export const PERIOD_OPTIONS: { key: PeriodKey; label: string }[] = [
   { key: "latest", label: "Latest month" },
@@ -292,11 +301,16 @@ export function filterReadings(
     return true;
   });
 
+  const descending = opts.sort.endsWith("-desc");
+  const byReading = opts.sort.startsWith("reading");
+
   matches.sort((a, b) => {
-    if (opts.sort === "unit") {
-      const byUnit = compareUnits(a.unit_number, b.unit_number);
-      if (byUnit !== 0) return byUnit;
-    }
+    const primary = byReading
+      ? a.reading_value - b.reading_value
+      : compareUnits(a.unit_number, b.unit_number);
+    if (primary !== 0) return descending ? -primary : primary;
+    // Same unit (its electricity and water meters, or several months of one
+    // meter) stays newest-first, so a tie never looks randomly ordered.
     return b.captured_at.localeCompare(a.captured_at);
   });
   return matches;
