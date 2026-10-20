@@ -36,11 +36,19 @@ export function AddOnsPanel({
     setPendingKey(key);
     startTransition(async () => {
       try {
-        await requestFeature(clientId, key);
-        router.refresh();
-      } catch (err) {
+        // The action returns its failure rather than throwing: a thrown error
+        // is redacted to an opaque digest in production, which tells the
+        // client nothing and leaves no trace of what actually went wrong.
+        const result = await requestFeature(clientId, key);
+        if (result.ok) {
+          router.refresh();
+        } else {
+          haptic("error");
+          setError(result.error ?? "Couldn't send that request. Please try again.");
+        }
+      } catch {
         haptic("error");
-        setError(err instanceof Error ? err.message : "Couldn't send that request. Please try again.");
+        setError("Couldn't reach the server. Check your connection and try again.");
       } finally {
         setPendingKey(null);
       }

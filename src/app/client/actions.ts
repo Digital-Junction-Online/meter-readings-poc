@@ -15,29 +15,45 @@ const NOTIFY = "support@wmfixandfinish.co.za";
  * The price is read from the catalogue here rather than taken from the
  * browser, so what's recorded is always what we actually quote.
  */
-export async function requestFeature(clientId: string, featureKey: string) {
+export async function requestFeature(
+  clientId: string,
+  featureKey: string
+): Promise<{ ok: boolean; error?: string }> {
   const profile = await getProfile();
-  if (!profile) throw new Error("Please sign in again.");
-  if (!isFeatureKey(featureKey)) throw new Error("Unknown add-on.");
+  if (!profile) return { ok: false, error: "Please sign in again." };
+  if (!isFeatureKey(featureKey)) return { ok: false, error: "Unknown add-on." };
 
   const addOn = ADD_ON_BY_KEY[featureKey];
   const user = await getSessionUser();
   const supabase = await createClient();
+  const requestedAt = new Date().toISOString();
 
-  // RLS limits this to a client the signed-in user actually has access to,
-  // and to a status of 'requested'.
-  const { error } = await supabase.from("client_features").upsert(
-    {
-      client_id: clientId,
-      feature_key: featureKey,
-      status: "requested",
-      price_cents: addOn.priceRand * 100,
-      requested_by: user?.id ?? null,
-      requested_at: new Date().toISOString(),
-    },
-    { onConflict: "client_id,feature_key" }
-  );
-  if (error) throw new Error(error.message);
+  // Deliberately not an upsert. PostgREST turns upsert into
+  // INSERT ... ON CONFLICT DO UPDATE SET <every column>, and Postgres checks
+  // UPDATE rights on all of them up front — including price_cents, which
+  // clients are not granted, so the statement is denied even when no conflict
+  // occurs. Insert first, then fall back to updating only what they may write.
+  const { error: insertError } = await supabase.from("client_features").insert({
+    client_id: clientId,
+    feature_key: featureKey,
+    status: "requested",
+    price_cents: addOn.priceRand * 100,
+    requested_by: user?.id ?? null,
+    requested_at: requestedAt,
+  });
+
+  if (insertError) {
+    // 23505 = unique violation: they've asked for this one before.
+    if (insertError.code !== "23505") {
+      return { ok: false, error: insertError.message };
+    }
+    const { error: updateError } = await supabase
+      .from("client_features")
+      .update({ status: "requested", requested_at: requestedAt, requested_by: user?.id ?? null })
+      .eq("client_id", clientId)
+      .eq("feature_key", featureKey);
+    if (updateError) return { ok: false, error: updateError.message };
+  }
 
   const { data: clientRow } = await supabase
     .from("clients")
@@ -74,4 +90,5 @@ export async function requestFeature(clientId: string, featureKey: string) {
 
   revalidatePath("/client");
   revalidatePath("/admin/add-ons");
+  return { ok: true };
 }
