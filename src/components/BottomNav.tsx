@@ -45,6 +45,11 @@ const QuotesIcon = ({ className }: IconProps) => (
     <path d="M9 12h7M9 16h5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
   </svg>
 );
+const AddOnsIcon = ({ className }: IconProps) => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true" className={className}>
+    <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+  </svg>
+);
 const UsersIcon = ({ className }: IconProps) => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true" className={className}>
     <circle cx="9" cy="8" r="3.2" stroke="currentColor" strokeWidth="2" />
@@ -87,6 +92,26 @@ function useReviewCount(): number {
   return count;
 }
 
+/** Add-on requests waiting on payment, badged the same way as review flags so
+ * a request can't sit unnoticed until the client chases it. */
+function useAddOnCount(): number {
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    createClient()
+      .from("client_features")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "requested")
+      .then(({ count: c }) => {
+        if (!cancelled) setCount(c ?? 0);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  return count;
+}
+
 function Badge({ count, className = "" }: { count: number; className?: string }) {
   if (count <= 0) return null;
   return (
@@ -104,6 +129,7 @@ export const BOTTOMNAV_H = "84px";
 export function BottomNav({ cta }: { cta?: ReactNode }) {
   const pathname = usePathname();
   const reviewCount = useReviewCount();
+  const addOnCount = useAddOnCount();
 
   const tab = (active: boolean) =>
     `flex min-h-12 flex-1 flex-col items-center justify-center gap-1 text-xs ${
@@ -184,6 +210,10 @@ export function BottomNav({ cta }: { cta?: ReactNode }) {
           </SideLink>
           <SideLink href="/admin/quotes" active={pathname.startsWith("/admin/quotes")} icon={<QuotesIcon className="h-5 w-5" />}>
             Quotes
+          </SideLink>
+          <SideLink href="/admin/add-ons" active={pathname.startsWith("/admin/add-ons")} icon={<AddOnsIcon className="h-5 w-5" />}>
+            Add-ons
+            <Badge count={addOnCount} className="ml-auto px-2 text-xs leading-5" />
           </SideLink>
           <SideGroup label="Admin" />
           <SideLink href="/admin/users" active={pathname.startsWith("/admin/users")} icon={<UsersIcon className="h-5 w-5" />}>
