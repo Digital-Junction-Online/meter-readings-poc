@@ -200,9 +200,9 @@ function UtilityDashboard({ service, rows }: { service: Service; rows: ReadingRo
             </ul>
           </div>
           <p className="mt-3 border-t border-divider pt-3 text-[13px] leading-relaxed text-text-body">
-            {okPct}% of {meta.label.toLowerCase()} readings looked normal against the meter&apos;s own history.
-            A flag isn&apos;t proof of a wrong reading — it just means the number was worth a second look
-            before it reaches a client.
+            {/* One expression, not interpolation followed by prose: JSX trims each line of a
+                multi-line text chunk, which silently ate the space before "readings". */}
+            {`${okPct}% of ${meta.label.toLowerCase()} readings looked normal against the meter's own history. A flag isn't proof of a wrong reading — it just means the number was worth a second look before it reaches a client.`}
           </p>
         </Panel>
 
@@ -223,14 +223,13 @@ function UtilityDashboard({ service, rows }: { service: Service; rows: ReadingRo
               <p className="font-bold">{trendExplanation.headline}</p>
               {trendExplanation.detail && <p className="mt-0.5 text-white/70">{trendExplanation.detail}</p>}
               <p className="mt-1.5 text-white/55">
-                The dashed line is the average month across the period shown. Bars above it used more than
-                usual, below it less.
+                The dashed line is the average month across the period shown — above it is more than usual,
+                below it less.
               </p>
             </div>
           ) : (
             <p className="mt-1 text-[13px] text-white/55">
-              Each bar is total {meta.label.toLowerCase()} used across every meter that month. A second month
-              of readings will let this compare.
+              {`Each point is total ${meta.label.toLowerCase()} used across every meter that month. A second month of readings will let this compare.`}
             </p>
           )}
           {suspect.length > 0 && (
