@@ -20,6 +20,7 @@ import {
   SERVICE_UNIT,
   unitTitle,
   type PeriodKey,
+  SORT_OPTIONS,
   type SortKey,
 } from "@/lib/clientReport";
 import type { Service } from "@/lib/types";
@@ -44,7 +45,7 @@ export function ReadingsExplorer({
   const [query, setQuery] = useState("");
   const [service, setService] = useState<Service | "all">("all");
   const [period, setPeriod] = useState<PeriodKey>("latest");
-  const [sort, setSort] = useState<SortKey>("newest");
+  const [sort, setSort] = useState<SortKey>("unit-asc");
   const [visible, setVisible] = useState(PAGE_SIZE);
   const [openId, setOpenId] = useState<string | null>(null);
   const [preparing, setPreparing] = useState(false);
@@ -177,8 +178,11 @@ export function ReadingsExplorer({
               onChange={(e) => change(() => setSort(e.target.value as SortKey))}
               className={`${controlClass} w-full`}
             >
-              <option value="newest">Newest first</option>
-              <option value="unit">Unit number</option>
+              {SORT_OPTIONS.map((o) => (
+                <option key={o.key} value={o.key}>
+                  {o.label}
+                </option>
+              ))}
             </select>
           </label>
         </div>

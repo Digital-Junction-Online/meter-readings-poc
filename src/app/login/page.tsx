@@ -85,12 +85,12 @@ function LoginForm() {
         </Link>
 
         <div className="mt-6 flex flex-col items-center gap-3.5 text-center">
-          <Image src="/icons/source-icon.png" alt="Wayne's Fix & Finish logo" width={80} height={80} className="rounded-[20px]" priority />
+          <Image src="/icons/source-icon.png" alt="Wayne's Meter Readings logo" width={80} height={80} className="rounded-[20px]" priority />
           <div>
             <h1 className="text-[26px] font-extrabold text-navy-900">
               {mode === "signin" ? "Meter Readings" : "Create an admin account"}
             </h1>
-            <p className="mt-1.5 text-[15px] text-text-muted">Wayne&apos;s Fix &amp; Finish</p>
+            <p className="mt-1.5 text-[15px] text-text-muted">Wayne&apos;s Meter Readings</p>
           </div>
         </div>
 

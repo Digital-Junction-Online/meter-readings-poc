@@ -132,6 +132,9 @@ export default async function ClientPreviewPage({
         basePath="/preview/client"
         greetingName="Sarah Naidoo"
         rows={buildMockRows(active.id)}
+        // Insights switched on here so the paid view can be reviewed; requests
+        // are disabled because there's no real client row behind this page.
+        featureStatuses={{ usage_insights: "active", email_reports: "requested" }}
       />
     </>
   );

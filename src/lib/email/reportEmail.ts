@@ -65,7 +65,7 @@ export function buildReportEmailHtml(params: {
           <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;overflow:hidden;max-width:600px;width:100%;">
             <tr>
               <td style="background:#0c1f3d;padding:22px 28px;">
-                <p style="margin:0;color:#58a93b;font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;">Wayne's Fix &amp; Finish</p>
+                <p style="margin:0;color:#58a93b;font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;">Wayne's Meter Readings</p>
                 <h1 style="margin:6px 0 0;color:#ffffff;font-size:20px;">${escapeHtml(propertyName)}</h1>
                 <p style="margin:4px 0 0;color:rgba(255,255,255,0.7);font-size:13px;">${escapeHtml(clientName)} · ${escapeHtml(periodLabel)}</p>
               </td>
@@ -114,7 +114,7 @@ export function buildReportEmailHtml(params: {
               <td style="padding:20px 28px 26px;">
                 <a href="${dashboardUrl}" style="display:inline-block;background:#58a93b;color:#ffffff;text-decoration:none;font-size:14px;font-weight:700;padding:12px 22px;border-radius:999px;">View full report &amp; photos online</a>
                 <p style="margin:16px 0 0;font-size:11px;color:#9ca3af;">
-                  Sent by Wayne's Fix &amp; Finish. Reply to this email or contact support@wmfixandfinish.co.za with any questions.
+                  Sent by Wayne's Meter Readings. Reply to this email or contact support@wmfixandfinish.co.za with any questions.
                 </p>
               </td>
             </tr>

@@ -119,7 +119,7 @@ export default async function AdminDashboardPage() {
         <div className="flex items-center justify-between gap-3 lg:hidden">
           <div className="flex items-center gap-2.5">
             <Image src="/icons/icon-192.png" alt="" width={34} height={34} className="rounded-[10px]" />
-            <span className="text-sm font-semibold text-white/85">Wayne&apos;s Fix &amp; Finish</span>
+            <span className="text-sm font-semibold text-white/85">Wayne&apos;s Meter Readings</span>
           </div>
           <div className="flex items-center gap-2">
             <InstallPrompt />

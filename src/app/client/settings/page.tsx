@@ -38,7 +38,7 @@ export default async function ClientSettingsPage() {
         </section>
 
         <div className="rounded-2xl bg-[#e8eef7] px-4 py-3.5 text-sm leading-relaxed text-navy-700">
-          <strong>Question about a reading?</strong> Contact Wayne&apos;s Fix &amp; Finish at{" "}
+          <strong>Question about a reading?</strong> Contact Wayne&apos;s Meter Readings at{" "}
           <a href="mailto:support@wmfixandfinish.co.za" className="font-bold underline">
             support@wmfixandfinish.co.za
           </a>

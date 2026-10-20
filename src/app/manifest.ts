@@ -2,9 +2,9 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Meter Readings — Wayne's Fix & Finish",
-    short_name: "Meter Readings",
-    description: "Electricity & water meter tracking for Wayne's Fix & Finish",
+    name: "WM — Wayne's Meter Readings",
+    short_name: "WM Readings",
+    description: "Electricity & water meter readings for your property",
     start_url: "/",
     display: "standalone",
     background_color: "#ffffff",

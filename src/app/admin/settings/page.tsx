@@ -38,7 +38,7 @@ export default async function AdminSettingsPage() {
 
         <div className="rounded-2xl border border-border bg-surface p-4">
           <h2 className="text-base font-bold text-navy-900">Business</h2>
-          <p className="mt-1 text-[15px] text-text-body">Wayne&rsquo;s Fix &amp; Finish</p>
+          <p className="mt-1 text-[15px] text-text-body">Wayne&rsquo;s Meter Readings</p>
           <p className="text-[13px] text-[#5d6c80]">Meter Readings app</p>
         </div>
 

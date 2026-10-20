@@ -5,11 +5,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, type ReactNode } from "react";
 import { AlertsFeed } from "@/components/AlertsFeed";
-import { ComingSoon } from "@/components/ComingSoon";
+import { AddOnsPanel } from "@/components/client/AddOnsPanel";
 import { ReadingsExplorer } from "@/components/client/ReadingsExplorer";
 import { UsageCard } from "@/components/client/UsageCard";
 import type { ReadingRow } from "@/components/ReadingsTable";
 import { buildServiceSummary, formatDay, openIssueIds, unitTitle } from "@/lib/clientReport";
+import type { FeatureStatus } from "@/lib/features";
 
 export interface ClientDashboardProps {
   propertyName: string;
@@ -23,13 +24,22 @@ export interface ClientDashboardProps {
   clientName?: string | null;
   /** Every reading (and meter-replacement marker) for this property, newest first. */
   rows: ReadingRow[];
+  /** The client record add-ons are requested against; null in preview. */
+  clientId?: string | null;
+  /** Current add-on status per feature key. Absent means never requested. */
+  featureStatuses?: Record<string, FeatureStatus>;
 }
 
-type Tab = "overview" | "readings" | "notices";
+type Tab = "readings" | "notices" | "insights" | "addons";
 
-const OverviewIcon = () => (
+const InsightsIcon = () => (
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-    <path d="M4 11l8-6 8 6v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+    <path d="M5 20V10M12 20V4M19 20v-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+  </svg>
+);
+const AddOnsIcon = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
   </svg>
 );
 const ReadingsIcon = () => (
@@ -52,9 +62,12 @@ export function ClientDashboard({
   greetingName,
   clientName,
   rows,
+  clientId = null,
+  featureStatuses = {},
 }: ClientDashboardProps) {
   const router = useRouter();
-  const [tab, setTab] = useState<Tab>("overview");
+  const [tab, setTab] = useState<Tab>("readings");
+  const hasInsights = featureStatuses.usage_insights === "active";
   const openIds = useMemo(() => openIssueIds(rows), [rows]);
   const summaries = useMemo(
     () => (["electricity", "water"] as const).map((s) => buildServiceSummary(rows, s)).filter((s) => s.latest),
@@ -76,9 +89,11 @@ export function ClientDashboard({
 
   const firstName = greetingName?.trim().split(/\s+/)[0];
   const tabs: { key: Tab; label: string; icon: ReactNode; badge?: number }[] = [
-    { key: "overview", label: "Overview", icon: <OverviewIcon /> },
     { key: "readings", label: "Readings", icon: <ReadingsIcon /> },
     { key: "notices", label: "Notices", icon: <NoticesIcon />, badge: openIds.size },
+    // Only on the dashboard once it has been paid for and switched on.
+    ...(hasInsights ? [{ key: "insights" as const, label: "Insights", icon: <InsightsIcon /> }] : []),
+    { key: "addons", label: "Add-ons", icon: <AddOnsIcon /> },
   ];
 
   function show(next: Tab) {
@@ -156,7 +171,7 @@ export function ClientDashboard({
       </header>
 
       <div className="mx-auto flex w-full min-w-0 max-w-5xl flex-col gap-4 px-4 py-5 lg:px-8 lg:py-8">
-        {tab === "overview" && (
+        {tab === "readings" && (
           <>
             {firstOpen && (
               <button
@@ -182,6 +197,16 @@ export function ClientDashboard({
               </button>
             )}
 
+            <ReadingsExplorer propertyName={propertyName} clientName={clientName} rows={rows} openIds={openIds} />
+          </>
+        )}
+
+        {tab === "insights" && (
+          <section className="flex flex-col gap-4" aria-label="Usage insights">
+            <div>
+              <h2 className="text-lg font-extrabold text-navy-900">Usage insights</h2>
+              <p className="text-sm text-[#5d6c80]">How {propertyName} is using electricity and water</p>
+            </div>
             {summaries.length > 0 ? (
               <div className={`grid grid-cols-1 gap-4 ${summaries.length > 1 ? "md:grid-cols-2" : ""}`}>
                 {summaries.map((s) => (
@@ -193,22 +218,11 @@ export function ClientDashboard({
                 Your usage will show here after the first two meter rounds.
               </p>
             )}
-
-            <div className="flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                onClick={() => show("readings")}
-                className="flex min-h-12 items-center gap-2 rounded-xl border-[1.5px] border-border-strong bg-surface px-4 text-[15px] font-bold text-navy-700 hover:bg-app-bg"
-              >
-                See all readings
-              </button>
-              <ComingSoon label="Cost & tariffs" />
-            </div>
-          </>
+          </section>
         )}
 
-        {tab === "readings" && (
-          <ReadingsExplorer propertyName={propertyName} clientName={clientName} rows={rows} openIds={openIds} />
+        {tab === "addons" && (
+          <AddOnsPanel clientId={clientId} statuses={featureStatuses} canRequest={!!clientId} />
         )}
 
         {tab === "notices" && (
@@ -224,8 +238,12 @@ export function ClientDashboard({
 
       <nav
         aria-label="Dashboard sections"
-        className="no-print fixed inset-x-0 bottom-0 z-30 grid grid-cols-3 border-t border-border bg-surface px-2 pt-2 lg:hidden"
-        style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 8px)" }}
+        className="no-print fixed inset-x-0 bottom-0 z-30 grid border-t border-border bg-surface px-2 pt-2 lg:hidden"
+        style={{
+          // Tab count varies: Insights only appears once it's been paid for.
+          gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))`,
+          paddingBottom: "calc(env(safe-area-inset-bottom) + 8px)",
+        }}
       >
         {tabs.map((t) => (
           <button

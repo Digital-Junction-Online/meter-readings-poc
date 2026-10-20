@@ -1,6 +1,10 @@
 "use client";
 
+import { useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Modal } from "@/components/Modal";
+import { editReading } from "@/app/admin/review/actions";
+import { uploadReadingPhoto } from "@/lib/readingPhoto";
 import type { ReadingRow } from "@/components/ReadingsTable";
 import { ADMIN_FLAG_LABEL, FLAG_CLASS, FLAG_DOT_CLASS, TONE_CLASS } from "@/lib/flagDisplay";
 import {
@@ -68,6 +72,139 @@ function PhotoLink({ url }: { url: string | null }) {
 }
 
 function AdminDetail({ row, onClose }: { row: ReadingRow; onClose: () => void }) {
+  const router = useRouter();
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(String(row.reading_value));
+  const [notes, setNotes] = useState(row.notes ?? "");
+  const [photo, setPhoto] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  function startEdit() {
+    setValue(String(row.reading_value));
+    setNotes(row.notes ?? "");
+    setPhoto(null);
+    setPhotoPreview(null);
+    setError(null);
+    setEditing(true);
+  }
+
+  function pickPhoto(file: File | null) {
+    setPhoto(file);
+    setPhotoPreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return file ? URL.createObjectURL(file) : null;
+    });
+  }
+
+  async function save() {
+    setError(null);
+    if (!value.trim() || Number.isNaN(Number.parseFloat(value))) {
+      setError("Enter a numeric reading.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const photoUrl = photo ? await uploadReadingPhoto(row.id, photo) : undefined;
+      await editReading({ readingId: row.id, rawValue: value, notes: notes.trim() || null, photoUrl });
+      router.refresh();
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save changes");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (editing) {
+    return (
+      <Modal title={`Edit ${row.unit_number} · ${row.service}`} onClose={onClose}>
+        <div className="flex flex-col gap-4">
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              aria-label="Keep or retake photo"
+              className="h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-navy-900"
+            >
+              {photoPreview || row.photo_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={photoPreview ?? row.photo_url!} alt="Meter photo" className="h-full w-full object-cover" />
+              ) : (
+                <span className="flex h-full w-full items-center justify-center text-xs text-white/50">No photo</span>
+              )}
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={(e) => pickPhoto(e.target.files?.[0] ?? null)}
+            />
+            <div className="flex min-w-0 flex-1 flex-col justify-center gap-1.5">
+              <p className="text-[13px] text-[#5d6c80]">
+                {photo ? "New photo attached" : "Keeping the original photo"}
+              </p>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="w-fit rounded-xl border-[1.5px] border-border-strong px-3 py-2 text-[13px] font-bold text-navy-700 hover:bg-app-bg"
+              >
+                Retake photo
+              </button>
+            </div>
+          </div>
+
+          <label className="flex flex-col gap-1.5">
+            <span className="text-sm font-semibold text-navy-900">Reading</span>
+            <input
+              type="text"
+              inputMode="decimal"
+              autoFocus
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              className="min-h-12 w-full rounded-xl border-[1.5px] border-border-strong bg-white px-3.5 py-2.5 font-mono text-base text-navy-900 outline-none focus:border-navy-700 focus:ring-2 focus:ring-navy-700/15"
+            />
+          </label>
+
+          <label className="flex flex-col gap-1.5">
+            <span className="text-sm font-semibold text-navy-900">Note (optional)</span>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={2}
+              className="w-full rounded-xl border-[1.5px] border-border-strong bg-white px-3.5 py-2.5 text-base text-navy-900 outline-none focus:border-navy-700 focus:ring-2 focus:ring-navy-700/15"
+            />
+          </label>
+
+          {error && <p className="text-sm font-medium text-red-600">{error}</p>}
+
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setEditing(false)}
+              disabled={saving}
+              className="min-h-12 flex-1 rounded-xl border-[1.5px] border-border-strong px-4 text-[15px] font-bold text-navy-700 hover:bg-app-bg disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={save}
+              disabled={saving}
+              className="min-h-12 flex-1 rounded-xl bg-navy-700 px-4 text-[15px] font-bold text-white hover:bg-navy-900 disabled:opacity-50"
+            >
+              {saving ? "Saving…" : "Save & mark reviewed"}
+            </button>
+          </div>
+        </div>
+      </Modal>
+    );
+  }
+
   return (
     <Modal title={`${row.unit_number} · ${row.service}`} onClose={onClose}>
       <div className="flex flex-col gap-4">
@@ -108,6 +245,14 @@ function AdminDetail({ row, onClose }: { row: ReadingRow; onClose: () => void })
         {row.notes && <p className="rounded-lg bg-app-bg px-3 py-2 text-sm text-text-body">{row.notes}</p>}
 
         <PhotoLink url={row.photo_url} />
+
+        <button
+          type="button"
+          onClick={startEdit}
+          className="min-h-12 w-full rounded-xl border-[1.5px] border-border-strong text-[15px] font-bold text-navy-700 hover:bg-app-bg"
+        >
+          Edit this reading
+        </button>
       </div>
     </Modal>
   );
