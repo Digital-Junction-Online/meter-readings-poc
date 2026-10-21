@@ -113,9 +113,33 @@ order by p.name, verdict, unit;
 
 
 -- =====================================================================
--- STEP 2 — apply the confirmed corrections. CHANGES BILLING FIGURES.
+-- STEP 2 — DO NOT RUN ON MOST ROWS. Read this first.
 -- =====================================================================
--- Uncomment and run ONLY after Wayne has opened each photo and confirmed it.
+-- Running this against Tarragon Two's real readings showed the assumption
+-- underneath it is wrong for most of them.
+--
+-- It assumes each bad reading is a one-off typo. For 17 of 22 rows it is not:
+-- the value jumps ten-fold ONCE and every later reading stays at the new
+-- scale.
+--
+--     Unit 115 water:  24710.49  ->  247312.6  ->  247558.90
+--
+-- Dividing only the flagged reading by 10 leaves the NEXT month reading
+-- 222,827 kL. The `next_month_if_fixed` column above is what catches this:
+-- if it is wildly larger than meter_usual, this correction is the WRONG one
+-- and will make the data worse.
+--
+-- Only four readings are genuine one-off typos, where both the month and the
+-- month after it land near that meter's usual:
+--     Unit 141 electricity 2026-04-13     Unit 135 water 2026-06-16
+--     Unit 149 water       2026-04-13     Unit 119 water 2026-08-23
+--
+-- For everything else, run meter_scale_audit.sql instead. It shows each
+-- meter's whole history and marks where the scale jumped, which is the
+-- boundary the photos need to settle.
+--
+-- Uncomment and run ONLY after Wayne has opened each photo and confirmed it,
+-- AND only for readings where next_month_if_fixed also looks right.
 -- Paste in the reading_id values from STEP 1 — nothing is corrected wholesale,
 -- and a reading whose photo was not checked does not belong in this list.
 --
