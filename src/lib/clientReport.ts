@@ -189,6 +189,7 @@ export interface MonthTotal {
  */
 export function suspectReadingIds(rows: ReadingRow[], service?: Service): Set<string> {
   const byMeter = new Map<string, number[]>();
+  const allUsages: number[] = [];
   for (const r of rows) {
     if (r.kind === "replacement") continue;
     if (service && r.service !== service) continue;
@@ -196,7 +197,18 @@ export function suspectReadingIds(rows: ReadingRow[], service?: Service): Set<st
     const list = byMeter.get(r.meter_id) ?? [];
     list.push(r.usage);
     byMeter.set(r.meter_id, list);
+    allUsages.push(r.usage);
   }
+
+  // A second yardstick, taken across the whole property. Some meters barely
+  // move — a vacant unit, or one replaced partway through — and 20x almost
+  // nothing is still almost nothing, so an ordinary month on a quiet meter
+  // trips the test on its own. Live data had exactly this: a unit using 104
+  // kWh flagged because its own usual was 0.43. A month that isn't even above
+  // what a typical meter here uses cannot be a digit typed in error.
+  allUsages.sort((a, b) => a - b);
+  const propertyUsual =
+    allUsages.length >= 3 ? allUsages[Math.floor((allUsages.length - 1) / 2)] : 0;
 
   const ceiling = new Map<string, number>();
   for (const [meterId, usages] of byMeter) {
@@ -212,7 +224,7 @@ export function suspectReadingIds(rows: ReadingRow[], service?: Service): Set<st
     if (r.kind === "replacement" || r.usage === null) continue;
     if (service && r.service !== service) continue;
     const limit = ceiling.get(r.meter_id);
-    if (limit !== undefined && r.usage > limit) ids.add(r.id);
+    if (limit !== undefined && r.usage > limit && r.usage > propertyUsual) ids.add(r.id);
   }
   return ids;
 }
