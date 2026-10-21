@@ -90,6 +90,16 @@ export function UsageCard({ summary }: { summary: ServiceSummary }) {
 
       {line && <p className={`mt-3 text-sm font-medium ${line.className}`}>{line.text}</p>}
 
+      {summary.suspect.length > 0 && (
+        <p className="mt-2 rounded-lg bg-app-bg px-3 py-2 text-[13px] text-[#5d6c80]">
+          {summary.suspect.length === 1 ? "A reading" : `${summary.suspect.length} readings`} on{" "}
+          {[...new Set(summary.suspect.map((s) => s.unitLabel))].join(", ")}{" "}
+          {summary.suspect.length === 1 ? "is" : "are"} far beyond what that meter has recorded
+          before, so {summary.suspect.length === 1 ? "it is" : "they are"} being checked and left
+          out of these figures.
+        </p>
+      )}
+
       {chartData.length > 1 && (
         <div className="mt-4 border-t border-divider pt-3">
           <div className="mb-1 flex items-baseline justify-between gap-2">

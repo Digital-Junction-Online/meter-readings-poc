@@ -168,10 +168,53 @@ export function openIssueIds(rows: ReadingRow[]): Set<string> {
 
 // -------------------------------------------------------------- summaries
 
+/** Usage this many times a meter's own history is a mistyped digit, not real. */
+const SUSPECT_MULTIPLE = 20;
+
 export interface MonthTotal {
   key: string;
   usage: number;
   readings: number;
+}
+
+/**
+ * Readings so far beyond their own meter's history that they can't be real
+ * consumption — the signature of a reading typed with an extra digit. One of
+ * these turns a property's month into millions of kL on its own, so every
+ * total, average and chart here is computed without them.
+ *
+ * Each meter is judged against its own median rather than against the whole
+ * property: meters are read at wildly different scales, and the median keeps
+ * the bad readings from dragging up the yardstick that catches them.
+ */
+export function suspectReadingIds(rows: ReadingRow[], service?: Service): Set<string> {
+  const byMeter = new Map<string, number[]>();
+  for (const r of rows) {
+    if (r.kind === "replacement") continue;
+    if (service && r.service !== service) continue;
+    if (r.usage === null || r.usage <= 0) continue;
+    const list = byMeter.get(r.meter_id) ?? [];
+    list.push(r.usage);
+    byMeter.set(r.meter_id, list);
+  }
+
+  const ceiling = new Map<string, number>();
+  for (const [meterId, usages] of byMeter) {
+    // Two readings can't tell a typo from a genuinely heavy month.
+    if (usages.length < 3) continue;
+    usages.sort((a, b) => a - b);
+    const median = usages[Math.floor((usages.length - 1) / 2)];
+    if (median > 0) ceiling.set(meterId, median * SUSPECT_MULTIPLE);
+  }
+
+  const ids = new Set<string>();
+  for (const r of rows) {
+    if (r.kind === "replacement" || r.usage === null) continue;
+    if (service && r.service !== service) continue;
+    const limit = ceiling.get(r.meter_id);
+    if (limit !== undefined && r.usage > limit) ids.add(r.id);
+  }
+  return ids;
 }
 
 export interface ServiceSummary {
@@ -187,14 +230,28 @@ export interface ServiceSummary {
   typical: number | null;
   /** Latest ÷ typical. 1 means a completely ordinary month. */
   ratio: number | null;
+  /** Mistyped readings left out of everything above, named so the figures
+   *  are seen to be short of something rather than quietly wrong. */
+  suspect: { id: string; unitLabel: string; monthKey: string }[];
 }
 
 export function buildServiceSummary(rows: ReadingRow[], service: Service): ServiceSummary {
+  const suspectIds = suspectReadingIds(rows, service);
+  const suspect: ServiceSummary["suspect"] = [];
+
   const byMonth = new Map<string, MonthTotal>();
   for (const r of rows) {
     if (r.kind === "replacement" || r.service !== service) continue;
     // A first reading has no usage yet, and a lower-than-previous one isn't real consumption.
     if (r.usage === null || r.usage < 0) continue;
+    if (suspectIds.has(r.id)) {
+      suspect.push({
+        id: r.id,
+        unitLabel: unitTitle(r.unit_number),
+        monthKey: monthKey(r.captured_at),
+      });
+      continue;
+    }
     const key = monthKey(r.captured_at);
     const entry = byMonth.get(key) ?? { key, usage: 0, readings: 0 };
     entry.usage += r.usage;
@@ -220,7 +277,7 @@ export function buildServiceSummary(rows: ReadingRow[], service: Service): Servi
     priorMonths.length > 0 ? priorMonths.reduce((sum, m) => sum + m.usage, 0) / priorMonths.length : null;
   const ratio = latest && typical && typical > 0 && !inProgress ? latest.usage / typical : null;
 
-  return { service, months, latest, previous, changePct, inProgress, typical, ratio };
+  return { service, months, latest, previous, changePct, inProgress, typical, ratio, suspect };
 }
 
 // --------------------------------------------------------------- filtering
@@ -322,8 +379,6 @@ export function filterReadings(
 // property's readings. A "unit" here is a unit of that property — these
 // figures never reach across to another client's property.
 
-/** Usage this many times a unit's own history is a mistyped digit, not real. */
-const SUSPECT_MULTIPLE = 20;
 /** How far off its own usual a unit has to be before it counts as a mover. */
 const MOVER_RATIO_UP = 1.4;
 const MOVER_RATIO_DOWN = 0.6;
@@ -360,10 +415,14 @@ export function buildUnitInsights(
   service: Service,
   latestKey: string
 ): UnitInsight[] {
+  // Dropped at reading level first, on the same test the cards above use, so
+  // the per-unit figures can't disagree with the property total.
+  const suspectIds = suspectReadingIds(rows, service);
+
   const byUnit = new Map<string, Map<string, number>>();
   for (const r of rows) {
     if (r.kind === "replacement" || r.service !== service) continue;
-    if (r.usage === null || r.usage < 0) continue;
+    if (r.usage === null || r.usage < 0 || suspectIds.has(r.id)) continue;
     const key = monthKey(r.captured_at);
     if (key > latestKey) continue;
     const months = byUnit.get(r.unit_number) ?? new Map<string, number>();
