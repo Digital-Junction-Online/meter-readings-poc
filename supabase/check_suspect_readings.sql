@@ -9,7 +9,14 @@
 --   usage  = this reading - the meter's previous reading
 --   median = that meter's own middle usage, over its positive months
 --   a reading is suspect when usage > 20x that median
+--     AND usage is also above what a typical meter at that property uses
 --   a meter with fewer than 3 usable months is never judged
+--
+-- That second condition matters. Some meters barely move — a vacant unit, or
+-- one replaced partway through — and 20x almost nothing is still almost
+-- nothing, so an ordinary month trips the test on its own. The first run of
+-- this query flagged Unit 124 using 104 kWh because that meter's own usual
+-- was 0.43 kWh. It was a perfectly normal month.
 --
 -- Expect ZERO rows on clean data. Every row is a reading Wayne should open
 -- in Review and either correct or accept.
@@ -40,6 +47,18 @@ baseline as (
   from stepped
   where usage > 0
   group by meter_id
+),
+property_usual as (
+  -- What a typical meter at this property uses in a month, per service.
+  select
+    m.property_id,
+    m.service,
+    percentile_disc(0.5) within group (order by s.usage) as median_usage,
+    count(*) as usable_months
+  from stepped s
+  join meters m on m.id = s.meter_id
+  where s.usage > 0
+  group by m.property_id, m.service
 )
 select
   p.name                                              as property,
@@ -53,6 +72,9 @@ select
   b.median_usage                                      as meter_usual,
   round(s.usage / nullif(b.median_usage, 0))          as times_usual,
   b.usable_months,
+  -- An extra digit typed in front leaves this_reading at ~10x the previous,
+  -- which is the signature to look for when you open the photo.
+  round((s.reading_value / nullif(s.previous_value, 0))::numeric, 2) as reading_ratio,
   mr.flag_status,
   mr.reviewed_at is not null                          as already_reviewed,
   mr.photo_url
@@ -61,8 +83,10 @@ join baseline   b  on b.meter_id = s.meter_id
 join meter_readings mr on mr.id = s.id
 join meters     m  on m.id  = s.meter_id
 join properties p  on p.id  = m.property_id
+join property_usual pu on pu.property_id = m.property_id and pu.service = m.service
 left join units un on un.id = m.unit_id
 where b.usable_months >= 3
   and b.median_usage  > 0
   and s.usage > b.median_usage * 20
+  and s.usage > pu.median_usage
 order by times_usual desc;
