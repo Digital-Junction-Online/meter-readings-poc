@@ -39,6 +39,32 @@ function gaugeCopy(ratio: number): string {
   return `${pct > 0 ? "+" : "−"}${Math.abs(pct)}%`;
 }
 
+/**
+ * Says what has been left out and why. These figures are the ones a client
+ * may recover costs against, so a total that is short of something has to
+ * say so — a quietly smaller number is indistinguishable from a wrong one.
+ */
+function SuspectNote({ summary }: { summary: ServiceSummary }) {
+  const typos = summary.suspect.filter((s) => s.typo);
+  const units = [...new Set(summary.suspect.map((s) => s.unitLabel))];
+  const months = [...new Set(summary.suspect.map((s) => s.monthKey))]
+    .sort()
+    .map((k) => monthName(k));
+
+  return (
+    <p className="mt-2 rounded-lg bg-app-bg px-3 py-2 text-[13px] text-[#5d6c80]">
+      {typos.length === 1 ? "A reading" : `${typos.length} readings`} on{" "}
+      {units.join(", ")} {typos.length === 1 ? "is" : "are"} far beyond what that meter has
+      recorded before, so {typos.length === 1 ? "it is" : "they are"} being checked.{" "}
+      {months.length === 1 ? months[0] : `${months.slice(0, -1).join(", ")} and ${months.at(-1)}`}{" "}
+      {months.length === 1 ? "is" : "are"} left out of these figures until then
+      {summary.suspect.length > typos.length &&
+        " — a reading that can't be trusted also leaves the month after it unmeasurable"}
+      .
+    </p>
+  );
+}
+
 export function UsageCard({ summary }: { summary: ServiceSummary }) {
   const { service, latest, ratio, typical } = summary;
   if (!latest) return null;
@@ -90,15 +116,7 @@ export function UsageCard({ summary }: { summary: ServiceSummary }) {
 
       {line && <p className={`mt-3 text-sm font-medium ${line.className}`}>{line.text}</p>}
 
-      {summary.suspect.length > 0 && (
-        <p className="mt-2 rounded-lg bg-app-bg px-3 py-2 text-[13px] text-[#5d6c80]">
-          {summary.suspect.length === 1 ? "A reading" : `${summary.suspect.length} readings`} on{" "}
-          {[...new Set(summary.suspect.map((s) => s.unitLabel))].join(", ")}{" "}
-          {summary.suspect.length === 1 ? "is" : "are"} far beyond what that meter has recorded
-          before, so {summary.suspect.length === 1 ? "it is" : "they are"} being checked and left
-          out of these figures.
-        </p>
-      )}
+      {summary.suspect.length > 0 && <SuspectNote summary={summary} />}
 
       {chartData.length > 1 && (
         <div className="mt-4 border-t border-divider pt-3">

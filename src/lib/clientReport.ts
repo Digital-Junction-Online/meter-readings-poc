@@ -217,6 +217,62 @@ export function suspectReadingIds(rows: ReadingRow[], service?: Service): Set<st
   return ids;
 }
 
+/**
+ * Usage per reading, with the readings a mistyped one makes unmeasurable
+ * left out entirely.
+ *
+ * A mistyped reading ruins TWO months, because usage is the step up from the
+ * reading before: its own month, and the next one, which is measured against
+ * an inflated previous and comes out negative.
+ *
+ * It's tempting to recover the next month by measuring it from the last
+ * trustworthy reading instead. Don't: that reading spans the gap, so it
+ * carries two months of consumption and lands all of it in one month. The
+ * total survives, but the client sees a spike that never happened and may go
+ * chasing a leak that isn't there.
+ *
+ * What the true split was is genuinely unknown until someone reads the photo
+ * and corrects the number. So neither month is counted, and both are named.
+ * Short and admittedly so beats confident and wrong on figures a client may
+ * recover costs against.
+ */
+function resolveUsage(
+  rows: ReadingRow[],
+  service: Service
+): { usageById: Map<string, number>; suspectIds: Set<string>; affectedIds: Set<string> } {
+  const suspectIds = suspectReadingIds(rows, service);
+  const byMeter = new Map<string, ReadingRow[]>();
+  for (const r of rows) {
+    if (r.kind === "replacement" || r.service !== service) continue;
+    const list = byMeter.get(r.meter_id) ?? [];
+    list.push(r);
+    byMeter.set(r.meter_id, list);
+  }
+
+  const usageById = new Map<string, number>();
+  const affectedIds = new Set<string>();
+  for (const list of byMeter.values()) {
+    list.sort((a, b) => a.captured_at.localeCompare(b.captured_at));
+    let afterSuspect = false;
+    for (const r of list) {
+      if (suspectIds.has(r.id)) {
+        afterSuspect = true;
+        continue;
+      }
+      if (afterSuspect) {
+        // Measured against a reading we don't trust, so it can't be used.
+        affectedIds.add(r.id);
+        afterSuspect = false;
+        continue;
+      }
+      // A first reading has no usage yet, and a meter that was replaced or
+      // rolled over reads lower than before — neither is real consumption.
+      if (r.usage !== null && r.usage >= 0) usageById.set(r.id, r.usage);
+    }
+  }
+  return { usageById, suspectIds, affectedIds };
+}
+
 export interface ServiceSummary {
   service: Service;
   months: MonthTotal[];
@@ -230,31 +286,33 @@ export interface ServiceSummary {
   typical: number | null;
   /** Latest ÷ typical. 1 means a completely ordinary month. */
   ratio: number | null;
-  /** Mistyped readings left out of everything above, named so the figures
-   *  are seen to be short of something rather than quietly wrong. */
-  suspect: { id: string; unitLabel: string; monthKey: string }[];
+  /** Readings left out of everything above, named so the figures are seen to
+   *  be short of something rather than quietly wrong. `typo` is the mistyped
+   *  reading itself; the rest are months it made unmeasurable. */
+  suspect: { id: string; unitLabel: string; monthKey: string; typo: boolean }[];
 }
 
 export function buildServiceSummary(rows: ReadingRow[], service: Service): ServiceSummary {
-  const suspectIds = suspectReadingIds(rows, service);
+  const { usageById, suspectIds, affectedIds } = resolveUsage(rows, service);
   const suspect: ServiceSummary["suspect"] = [];
 
   const byMonth = new Map<string, MonthTotal>();
   for (const r of rows) {
     if (r.kind === "replacement" || r.service !== service) continue;
-    // A first reading has no usage yet, and a lower-than-previous one isn't real consumption.
-    if (r.usage === null || r.usage < 0) continue;
-    if (suspectIds.has(r.id)) {
+    if (suspectIds.has(r.id) || affectedIds.has(r.id)) {
       suspect.push({
         id: r.id,
         unitLabel: unitTitle(r.unit_number),
         monthKey: monthKey(r.captured_at),
+        typo: suspectIds.has(r.id),
       });
       continue;
     }
+    const usage = usageById.get(r.id);
+    if (usage === undefined) continue;
     const key = monthKey(r.captured_at);
     const entry = byMonth.get(key) ?? { key, usage: 0, readings: 0 };
-    entry.usage += r.usage;
+    entry.usage += usage;
     entry.readings += 1;
     byMonth.set(key, entry);
   }
@@ -415,18 +473,20 @@ export function buildUnitInsights(
   service: Service,
   latestKey: string
 ): UnitInsight[] {
-  // Dropped at reading level first, on the same test the cards above use, so
-  // the per-unit figures can't disagree with the property total.
-  const suspectIds = suspectReadingIds(rows, service);
+  // Exactly the figures the cards above use, so the per-unit breakdown can
+  // never disagree with the property total it sits under.
+  const { usageById, suspectIds, affectedIds } = resolveUsage(rows, service);
 
   const byUnit = new Map<string, Map<string, number>>();
   for (const r of rows) {
     if (r.kind === "replacement" || r.service !== service) continue;
-    if (r.usage === null || r.usage < 0 || suspectIds.has(r.id)) continue;
+    if (suspectIds.has(r.id) || affectedIds.has(r.id)) continue;
+    const usage = usageById.get(r.id);
+    if (usage === undefined) continue;
     const key = monthKey(r.captured_at);
     if (key > latestKey) continue;
     const months = byUnit.get(r.unit_number) ?? new Map<string, number>();
-    months.set(key, (months.get(key) ?? 0) + r.usage);
+    months.set(key, (months.get(key) ?? 0) + usage);
     byUnit.set(r.unit_number, months);
   }
 
