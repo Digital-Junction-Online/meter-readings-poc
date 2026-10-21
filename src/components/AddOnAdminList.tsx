@@ -82,6 +82,15 @@ export function AddOnAdminList({ rows }: { rows: AddOnRow[] }) {
           {row.activatedAt && ` · live since ${formatDate(row.activatedAt)}`}
         </p>
 
+        {/* Switching on an unbuilt add-on changes nothing for the client, so
+            say so here rather than let it be invoiced by mistake. */}
+        {addOn && !addOn.available && (
+          <p className="rounded-lg bg-amber-50 px-3 py-2 text-[13px] font-medium text-amber-900">
+            Not built yet. Switching this on gives {row.clientName} nothing new to use — treat the
+            request as a vote for it, and don&apos;t invoice until it&apos;s ready.
+          </p>
+        )}
+
         <div className="flex flex-wrap gap-2">
           {row.status !== "active" && (
             <button
