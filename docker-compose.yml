@@ -1,0 +1,21 @@
+# Stack "wayne-app" on dj-server1. See deploy/README.md.
+# No published ports: only cloudflared reaches it, over the shared Docker
+# network, the same way the previews stack works.
+services:
+  wayne-app:
+    build:
+      context: .
+      args:
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL}
+    image: wayne-app:latest
+    container_name: wayne-app
+    restart: unless-stopped
+    env_file: .env
+    networks:
+      - garage_default
+
+networks:
+  garage_default:
+    external: true

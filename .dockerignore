@@ -1,0 +1,12 @@
+node_modules
+.next
+.git
+.vercel
+.claude
+.env*
+migration
+supabase
+scripts
+*.md
+Dockerfile
+docker-compose.yml
