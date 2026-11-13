@@ -50,7 +50,11 @@ export const ADD_ONS: AddOn[] = [
       "Useful for trustee packs and AGM minutes",
     ],
     priceRand: 49,
-    available: true,
+    // Not built: nothing reads this key, and there is no scheduled send. Wayne
+    // can already email a report by hand from Admin -> Reports, but switching
+    // this on would put nothing new on the client's dashboard, so it must not
+    // present itself as ready to buy.
+    available: false,
   },
   {
     key: "direct_chat",
