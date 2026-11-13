@@ -59,39 +59,44 @@ ssh-keygen -t ed25519 -f ~/.ssh/wayne-app-deploy -N "" -C "dj-server1 wayne-app"
 cat ~/.ssh/wayne-app-deploy.pub
 ```
 
-GitHub → `Digital-Junction-Online/meter-readings-poc` → Settings → Deploy keys → Add deploy key. Paste the line, name it `dj-server1`, and **leave "Allow write access" off**. Save the private key in the vault.
-
-Tell SSH which key to use for this repo:
-
-```
-nano ~/.ssh/config
-```
-
-Add these lines, then save:
-
-```
-Host github-wayne-app
-  HostName github.com
-  User git
-  IdentityFile ~/.ssh/wayne-app-deploy
-  IdentitiesOnly yes
-```
+GitHub → `Digital-Junction-Online/meter-readings-poc` → Settings → Deploy keys → Add deploy key. Paste the line, name it `dj-server1`, and **untick "Allow write access"** (it can come up ticked). The list should then say "Read-only". Save the private key in the vault.
 
 ### 2.2 Download the app
 
+Name the key in the command itself. The first time, answer `yes` to "Are you sure you want to continue connecting". GitHub's ED25519 fingerprint is `SHA256:+DiY3wvvV6TuJJhbpZisF/zLDA0zPMSvHdkr4UvCOqU`.
+
 ```
-cd ~
-git clone -b main git@github-wayne-app:Digital-Junction-Online/meter-readings-poc.git wayne-app
-cd wayne-app
+cd ~ && GIT_SSH_COMMAND="ssh -i ~/.ssh/wayne-app-deploy -o IdentitiesOnly=yes" git clone -b main git@github.com:Digital-Junction-Online/meter-readings-poc.git wayne-app
+```
+
+Make the repo remember the key for later `git pull`s:
+
+```
+cd ~/wayne-app && git config core.sshCommand "ssh -i ~/.ssh/wayne-app-deploy -o IdentitiesOnly=yes" && ls
 ```
 
 ### 2.3 Fill in the settings
 
+Three settings are fixed and two are copied from djbase's own `.env`, so no key is typed by hand. The file is created readable by you only, and the command prints the names, never the values:
+
 ```
-nano .env
+cd ~/wayne-app && umask 077 && { echo "NEXT_PUBLIC_SUPABASE_URL=https://api.djbase.co.za"; echo "NEXT_PUBLIC_SITE_URL=https://app.wmfixandfinish.co.za"; echo "REBILL_API_BASE=https://api.rebill.co.za"; grep '^ANON_KEY=' ~/wayne-supabase/.env | sed 's/^/NEXT_PUBLIC_SUPABASE_/'; grep '^SERVICE_ROLE_KEY=' ~/wayne-supabase/.env | sed 's/^/SUPABASE_/'; } > .env && cut -d= -f1 .env
 ```
 
-Seven lines, `NAME=value`, no quotes and no spaces around `=`. Take each value from the vault or from where the table says. The Vercel settings page may be locked while the account is suspended.
+The Rebill and Brevo keys come from the vault. These prompts hide what you paste, so the keys stay out of the screen and the shell history:
+
+```
+read -rsp "Paste the Rebill key, then press Enter: " K && echo "REBILL_API_KEY=$K" >> .env && unset K && echo " saved"
+read -rsp "Paste the Brevo key, then press Enter: " K && echo "BREVO_API_KEY=$K" >> .env && unset K && echo " saved"
+```
+
+Check all seven are filled in. It shows "set" or "EMPTY", never the key:
+
+```
+awk -F= '{print $1, (length($2)>0 ? "set" : "EMPTY")}' .env
+```
+
+What each setting is, for reference:
 
 | Setting | Value |
 |---|---|
@@ -102,12 +107,6 @@ Seven lines, `NAME=value`, no quotes and no spaces around `=`. Take each value f
 | `REBILL_API_BASE` | `https://api.rebill.co.za` |
 | `REBILL_API_KEY` | Rebill → Settings → Developer → API Access (vault) |
 | `BREVO_API_KEY` | Brevo → SMTP & API → API Keys (vault) |
-
-Lock the file so only you can read it:
-
-```
-chmod 600 .env
-```
 
 ### 2.4 Check the Docker network name
 
@@ -121,7 +120,7 @@ If the name isn't `garage_default`, change both places in `docker-compose.yml` t
 
 ### 2.5 Build and start it
 
-The first build takes 5 to 10 minutes and uses 1 to 2 GB of memory for a few minutes.
+The first build takes about 4 to 10 minutes (about 4 on 13 Nov 2026) and uses 1 to 2 GB of memory while it runs.
 
 ```
 docker compose up -d --build
