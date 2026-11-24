@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/Modal";
 import { editReading } from "@/app/admin/review/actions";
+import { ReadingCorrectionFields } from "@/components/ReadingCorrectionFields";
 import { uploadReadingPhoto } from "@/lib/readingPhoto";
 import type { ReadingRow } from "@/components/ReadingsTable";
 import { ADMIN_FLAG_LABEL, FLAG_CLASS, FLAG_DOT_CLASS, TONE_CLASS } from "@/lib/flagDisplay";
@@ -75,6 +76,8 @@ function AdminDetail({ row, onClose }: { row: ReadingRow; onClose: () => void })
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(String(row.reading_value));
+  const canFixPrevious = !!row.previous_reading_id && row.previous_value !== null;
+  const [previousValue, setPreviousValue] = useState(row.previous_value !== null ? String(row.previous_value) : "");
   const [notes, setNotes] = useState(row.notes ?? "");
   const [photo, setPhoto] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
@@ -84,6 +87,7 @@ function AdminDetail({ row, onClose }: { row: ReadingRow; onClose: () => void })
 
   function startEdit() {
     setValue(String(row.reading_value));
+    setPreviousValue(row.previous_value !== null ? String(row.previous_value) : "");
     setNotes(row.notes ?? "");
     setPhoto(null);
     setPhotoPreview(null);
@@ -105,10 +109,20 @@ function AdminDetail({ row, onClose }: { row: ReadingRow; onClose: () => void })
       setError("Enter a numeric reading.");
       return;
     }
+    if (canFixPrevious && (!previousValue.trim() || Number.isNaN(Number.parseFloat(previousValue)))) {
+      setError("Enter a numeric last reading.");
+      return;
+    }
     setSaving(true);
     try {
       const photoUrl = photo ? await uploadReadingPhoto(row.id, photo) : undefined;
-      await editReading({ readingId: row.id, rawValue: value, notes: notes.trim() || null, photoUrl });
+      await editReading({
+        readingId: row.id,
+        rawValue: value,
+        notes: notes.trim() || null,
+        photoUrl,
+        previous: canFixPrevious ? { readingId: row.previous_reading_id!, rawValue: previousValue } : undefined,
+      });
       router.refresh();
       onClose();
     } catch (err) {
@@ -158,17 +172,13 @@ function AdminDetail({ row, onClose }: { row: ReadingRow; onClose: () => void })
             </div>
           </div>
 
-          <label className="flex flex-col gap-1.5">
-            <span className="text-sm font-semibold text-navy-900">Reading</span>
-            <input
-              type="text"
-              inputMode="decimal"
-              autoFocus
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              className="min-h-12 w-full rounded-xl border-[1.5px] border-border-strong bg-white px-3.5 py-2.5 font-mono text-base text-navy-900 outline-none focus:border-navy-700 focus:ring-2 focus:ring-navy-700/15"
-            />
-          </label>
+          <ReadingCorrectionFields
+            value={value}
+            onValueChange={setValue}
+            previousValue={canFixPrevious ? previousValue : null}
+            onPreviousValueChange={setPreviousValue}
+            unitWord={row.service === "water" ? "kL" : "kWh"}
+          />
 
           <label className="flex flex-col gap-1.5">
             <span className="text-sm font-semibold text-navy-900">Note (optional)</span>

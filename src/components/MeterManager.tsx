@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { createMeter, deleteMeter } from "@/app/admin/clients/actions";
+import { createMeter, deleteMeter, setMeterWholeNumbers } from "@/app/admin/clients/actions";
 import type { Meter, Service } from "@/lib/types";
 
 const SERVICE_COLOR: Record<Service, string> = {
@@ -62,6 +62,18 @@ export function MeterManager({
         router.refresh();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to add meter");
+      }
+    });
+  }
+
+  function handleWholeNumbers(meterId: string, wholeNumbers: boolean) {
+    setError(null);
+    startTransition(async () => {
+      try {
+        await setMeterWholeNumbers(meterId, wholeNumbers);
+        router.refresh();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to update meter");
       }
     });
   }
@@ -217,6 +229,19 @@ export function MeterManager({
                       <span className="ml-1.5 font-normal text-[#5d6c80]">communal</span>
                     )}
                   </span>
+                  <label
+                    className="flex shrink-0 cursor-pointer items-center gap-1.5 text-[#5d6c80]"
+                    title="Tick if this meter's dial has no decimal point"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={!!m.whole_numbers}
+                      disabled={isPending}
+                      onChange={(e) => handleWholeNumbers(m.id, e.target.checked)}
+                      className="h-4 w-4 accent-navy-700"
+                    />
+                    No decimal
+                  </label>
                   <span className="shrink-0 text-[#5d6c80]">
                     {m.reading_count} reading{m.reading_count === 1 ? "" : "s"}
                   </span>

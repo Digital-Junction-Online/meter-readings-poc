@@ -18,6 +18,8 @@ export interface ReadingRow {
   service: string;
   reading_value: number;
   previous_value: number | null;
+  /** The meter's reading before this one, so an admin can correct it from here. */
+  previous_reading_id?: string | null;
   usage: number | null;
   flag_status: FlagStatus;
   /** An admin has looked at this reading (accepted or corrected it). */

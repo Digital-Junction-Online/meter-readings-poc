@@ -13,6 +13,14 @@ export function looksLikePartialEntry(raw: string): boolean {
   return !VALID_READING_PATTERN.test(raw.trim());
 }
 
+/** A decimal point typed on a meter whose dial has none (meters.whole_numbers). */
+export function hasDecimalOnWholeMeter(raw: string, wholeNumbers: boolean | undefined): boolean {
+  return !!wholeNumbers && raw.includes(".");
+}
+
+export const WHOLE_NUMBER_MESSAGE =
+  "This meter has no decimal point. Type the whole number on the dial, for example 68705, not 6870.5.";
+
 /**
  * Mean of a meter's own prior consumption, for judging whether a new reading
  * is a plausible next step for THIS meter.

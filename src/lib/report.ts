@@ -43,11 +43,12 @@ export async function buildReportRows(
 
   // Deltas are computed over the FULL unfiltered history, keyed by meter, so
   // "previous" and "usage" stay accurate even when only a slice is displayed.
-  const lastSeen = new Map<string, number>();
+  const lastSeen = new Map<string, MeterReading>();
   const rows: ReadingRow[] = readings.map((r) => {
     const meter = meterById.get(r.meter_id);
-    const previous = lastSeen.get(r.meter_id) ?? null;
-    lastSeen.set(r.meter_id, r.reading_value);
+    const previousReading = lastSeen.get(r.meter_id) ?? null;
+    const previous = previousReading?.reading_value ?? null;
+    lastSeen.set(r.meter_id, r);
 
     // Per-unit meters display their unit number; communal meters display
     // their label ("Main Water Meter", "Public 1", ...).
@@ -64,6 +65,7 @@ export async function buildReportRows(
       service: meter?.service ?? "electricity",
       reading_value: r.reading_value,
       previous_value: previous,
+      previous_reading_id: previousReading?.id ?? null,
       usage: previous !== null ? r.reading_value - previous : null,
       flag_status: r.flag_status,
       reviewed: !!r.reviewed_at,

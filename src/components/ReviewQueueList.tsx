@@ -4,6 +4,7 @@ import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { acceptReading, editReading } from "@/app/admin/review/actions";
 import { uploadReadingPhoto } from "@/lib/readingPhoto";
+import { ReadingCorrectionFields } from "@/components/ReadingCorrectionFields";
 import { formatDateTime } from "@/lib/date";
 import { haptic } from "@/lib/haptics";
 import { BAND_META, BAND_ORDER, triageReading, type TriageBand } from "@/lib/triage";
@@ -23,6 +24,8 @@ export interface ReviewItem {
   flagStatus: FlagStatus;
   readingValue: number;
   previousValue: number | null;
+  /** The meter's reading before this one, so it can be corrected from the card. */
+  previousReadingId: string | null;
   /** Consumption since the previous reading; null for a meter's first. */
   usage: number | null;
   /** This meter's own average consumption before this reading. */
@@ -39,6 +42,7 @@ export function ReviewQueueList({ items }: { items: ReviewItem[] }) {
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
+  const [editPrevious, setEditPrevious] = useState("");
   const [editNotes, setEditNotes] = useState("");
   const [editPhoto, setEditPhoto] = useState<File | null>(null);
   const [editPhotoPreview, setEditPhotoPreview] = useState<string | null>(null);
@@ -74,6 +78,7 @@ export function ReviewQueueList({ items }: { items: ReviewItem[] }) {
     haptic("tap");
     setEditingId(item.readingId);
     setEditValue(String(item.readingValue));
+    setEditPrevious(item.previousValue !== null ? String(item.previousValue) : "");
     setEditNotes(item.notes ?? "");
     setEditPhoto(null);
     setEditPhotoPreview(null);
@@ -97,18 +102,30 @@ export function ReviewQueueList({ items }: { items: ReviewItem[] }) {
     });
   }
 
-  async function saveEdit(readingId: string) {
+  async function saveEdit(item: ReviewItem) {
+    const readingId = item.readingId;
+    const canFixPrevious = !!item.previousReadingId && item.previousValue !== null;
     setEditError(null);
     const value = Number.parseFloat(editValue);
     if (!editValue.trim() || Number.isNaN(value)) {
       setEditError("Enter a numeric reading.");
       return;
     }
+    if (canFixPrevious && (!editPrevious.trim() || Number.isNaN(Number.parseFloat(editPrevious)))) {
+      setEditError("Enter a numeric last reading.");
+      return;
+    }
     haptic("success");
     setSavingEdit(true);
     try {
       const photoUrl = editPhoto ? await uploadReadingPhoto(readingId, editPhoto) : undefined;
-      await editReading({ readingId, rawValue: editValue, notes: editNotes.trim() || null, photoUrl });
+      await editReading({
+        readingId,
+        rawValue: editValue,
+        notes: editNotes.trim() || null,
+        photoUrl,
+        previous: canFixPrevious ? { readingId: item.previousReadingId!, rawValue: editPrevious } : undefined,
+      });
       cancelEdit();
       router.refresh();
     } catch (err) {
@@ -275,16 +292,13 @@ export function ReviewQueueList({ items }: { items: ReviewItem[] }) {
                 className="hidden"
                 onChange={(e) => handleRetake(e.target.files?.[0] ?? null)}
               />
-              <label className="flex flex-col gap-1.5 text-sm font-semibold text-navy-900">
-                Corrected reading
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  value={editValue}
-                  onChange={(e) => setEditValue(e.target.value)}
-                  className="h-[50px] w-full rounded-xl border-[1.5px] border-border-strong bg-surface px-3.5 font-mono text-lg font-bold text-navy-900 outline-none tabular-nums focus:border-navy-700"
-                />
-              </label>
+              <ReadingCorrectionFields
+                value={editValue}
+                onValueChange={setEditValue}
+                previousValue={item.previousReadingId && item.previousValue !== null ? editPrevious : null}
+                onPreviousValueChange={setEditPrevious}
+                unitWord={unitWord}
+              />
               <label className="flex flex-col gap-1.5 text-sm font-semibold text-navy-900">
                 Note (optional)
                 <textarea
@@ -318,7 +332,7 @@ export function ReviewQueueList({ items }: { items: ReviewItem[] }) {
                 </button>
                 <button
                   type="button"
-                  onClick={() => saveEdit(item.readingId)}
+                  onClick={() => saveEdit(item)}
                   disabled={savingEdit}
                   className="min-h-[52px] rounded-2xl bg-navy-700 text-[15px] font-bold text-white hover:bg-navy-900 disabled:opacity-50"
                 >
