@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createMeter, deleteMeter, setMeterWholeNumbers } from "@/app/admin/clients/actions";
@@ -64,6 +65,18 @@ export function MeterManager({
         setError(err instanceof Error ? err.message : "Failed to add meter");
       }
     });
+  }
+
+  // Every reading for one meter, in Reports. The unit filter matches the unit
+  // number (or a communal meter's label), and `all` lists the whole history.
+  function readingsHref(m: MeterRow): string {
+    const qs = new URLSearchParams({
+      property: propertyId,
+      unit: m.unit_number ?? m.label,
+      service: m.service,
+      all: "1",
+    });
+    return `/admin/reports?${qs.toString()}`;
   }
 
   function handleWholeNumbers(meterId: string, wholeNumbers: boolean) {
@@ -218,17 +231,23 @@ export function MeterManager({
                   key={m.id}
                   className="flex min-h-11 items-center gap-2.5 rounded-xl border border-border px-3 py-2 text-[13px]"
                 >
-                  <span
-                    className={`shrink-0 rounded-full border-2 bg-white px-2 py-0.5 font-medium capitalize ${SERVICE_COLOR[m.service]}`}
+                  <Link
+                    href={readingsHref(m)}
+                    title="See this meter's readings"
+                    className="flex min-h-9 min-w-0 flex-1 items-center gap-2.5 rounded-lg hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy-700"
                   >
-                    {m.unit_number ?? m.service}
-                  </span>
-                  <span className="min-w-0 flex-1 truncate font-medium text-navy-900">
-                    {m.label}
-                    {m.is_communal && (
-                      <span className="ml-1.5 font-normal text-[#5d6c80]">communal</span>
-                    )}
-                  </span>
+                    <span
+                      className={`shrink-0 rounded-full border-2 bg-white px-2 py-0.5 font-medium capitalize ${SERVICE_COLOR[m.service]}`}
+                    >
+                      {m.unit_number ?? m.service}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate font-medium text-navy-900">
+                      {m.label}
+                      {m.is_communal && (
+                        <span className="ml-1.5 font-normal text-[#5d6c80]">communal</span>
+                      )}
+                    </span>
+                  </Link>
                   <label
                     className="flex shrink-0 cursor-pointer items-center gap-1.5 text-[#5d6c80]"
                     title="Tick if this meter's dial has no decimal point"
