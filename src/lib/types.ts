@@ -41,6 +41,8 @@ export interface Meter {
   /** Set once this meter has been physically replaced — null means active. */
   retired_at: string | null;
   replaced_by_meter_id: string | null;
+  /** The dial has no decimal point (migration 008). Missing before that runs. */
+  whole_numbers?: boolean;
   created_at: string;
 }
 

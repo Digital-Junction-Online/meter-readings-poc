@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireAdmin } from "@/lib/auth";
 import { computeFlagStatusForReading } from "@/lib/computeReadingFlag";
+import { hasDecimalOnWholeMeter } from "@/lib/flagging";
 import type { Meter } from "@/lib/types";
 
 export async function POST(req: NextRequest) {
@@ -53,6 +54,12 @@ export async function POST(req: NextRequest) {
     flag_status = await computeFlagStatusForReading({ meter, rawValue: raw_value, value, cutoff });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "Flagging failed" }, { status: 500 });
+  }
+  // The capture screen already refuses this. A reading queued offline on an
+  // older screen can still arrive with one, so keep it (refusing would lose a
+  // reading taken on site) but send it to Review rather than into the totals.
+  if (hasDecimalOnWholeMeter(raw_value, meter.whole_numbers)) {
+    flag_status = "possible_partial" as const;
   }
 
   const { data: inserted, error: insertError } = await supabase

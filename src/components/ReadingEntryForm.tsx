@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/browser";
 import { formatDate } from "@/lib/date";
 import { haptic } from "@/lib/haptics";
 import { queueReading } from "@/lib/offlineQueue";
+import { hasDecimalOnWholeMeter, WHOLE_NUMBER_MESSAGE } from "@/lib/flagging";
 import type { Service } from "@/lib/types";
 
 function looksOffline(err: unknown): boolean {
@@ -34,6 +35,7 @@ export function ReadingEntryForm({
   previousValue,
   previousCapturedAt,
   trailingAverage,
+  wholeNumbers = false,
 }: {
   propertyId: string;
   propertyName: string;
@@ -47,6 +49,8 @@ export function ReadingEntryForm({
   previousValue: number | null;
   previousCapturedAt: string | null;
   trailingAverage: number | null;
+  /** The dial has no decimal point: the "." key is taken away. */
+  wholeNumbers?: boolean;
 }) {
   const router = useRouter();
   const [raw, setRaw] = useState("");
@@ -62,7 +66,7 @@ export function ReadingEntryForm({
     haptic("tap");
     setRaw((s) => {
       if (ch === "back") return s.slice(0, -1);
-      if (ch === "." && s.includes(".")) return s;
+      if (ch === "." && (wholeNumbers || s.includes("."))) return s;
       if (s.replace(".", "").length >= 9) return s;
       return s + ch;
     });
@@ -149,6 +153,11 @@ export function ReadingEntryForm({
     if (!raw || !photo) {
       haptic("error");
       setError("Enter a reading and attach a photo before saving.");
+      return;
+    }
+    if (hasDecimalOnWholeMeter(raw, wholeNumbers)) {
+      haptic("error");
+      setError(WHOLE_NUMBER_MESSAGE);
       return;
     }
     // Fires on the tap rather than after the upload: Android drops vibrate()
@@ -330,6 +339,11 @@ export function ReadingEntryForm({
             <span className="font-mono text-[34px] font-bold tracking-wide tabular-nums">{display}</span>
             <span className="text-[15px] text-white/60">{unitLabel}</span>
           </div>
+          {wholeNumbers && (
+            <p className="rounded-lg bg-app-bg px-3 py-2 text-[13px] font-semibold text-navy-900">
+              No decimal point on this meter. Type every digit on the dial.
+            </p>
+          )}
           <div className="flex items-start justify-between gap-3">
             <p className={`text-[13px] leading-snug ${hintClass}`}>{hint}</p>
             {delta !== "—" && (
@@ -339,7 +353,10 @@ export function ReadingEntryForm({
         </section>
 
         <div className="grid grid-cols-3 gap-2">
-          {KEYS.map((k) => (
+          {KEYS.map((k) =>
+            k === "." && wholeNumbers ? (
+              <span key={k} aria-hidden="true" className="h-[54px] rounded-xl bg-app-bg" />
+            ) : (
             <button
               key={k}
               type="button"
@@ -358,7 +375,8 @@ export function ReadingEntryForm({
                 k
               )}
             </button>
-          ))}
+            )
+          )}
         </div>
 
         {showNote ? (

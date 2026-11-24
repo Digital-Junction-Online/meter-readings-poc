@@ -67,6 +67,7 @@ export default async function ReviewQueuePage() {
         flagStatus: reading.flag_status,
         readingValue: reading.reading_value,
         previousValue: previous?.reading_value ?? null,
+        previousReadingId: previous?.id ?? null,
         usage: previous ? reading.reading_value - previous.reading_value : null,
         trailingAverage,
         capturedAt: reading.captured_at,

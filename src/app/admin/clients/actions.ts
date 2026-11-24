@@ -321,3 +321,24 @@ export async function deleteMeter(meterId: string) {
 
   revalidatePath("/admin/clients");
 }
+
+/** Marks a meter's dial as whole units only, so a decimal point is refused at capture. */
+export async function setMeterWholeNumbers(meterId: string, wholeNumbers: boolean) {
+  await requireAdmin();
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("meters")
+    .update({ whole_numbers: wholeNumbers })
+    .eq("id", meterId);
+  if (error) {
+    throw new Error(
+      error.message.includes("whole_numbers")
+        ? "The database needs updating first (migration 008)."
+        : error.message
+    );
+  }
+
+  revalidatePath("/admin/clients");
+  revalidatePath("/capture");
+}

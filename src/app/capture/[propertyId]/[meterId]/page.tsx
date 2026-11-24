@@ -74,6 +74,7 @@ export default async function ReadingEntryPage({
       previousValue={previous?.reading_value ?? null}
       previousCapturedAt={previous?.captured_at ?? null}
       trailingAverage={trailingAverage}
+      wholeNumbers={!!meter.whole_numbers}
     />
   );
 }
