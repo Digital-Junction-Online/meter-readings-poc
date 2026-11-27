@@ -108,9 +108,17 @@ export default async function AdminReportsPage({
             to get started.
           </p>
         ) : (
-          <div className="flex flex-col gap-5 lg:grid lg:grid-cols-[320px_minmax(0,1fr)] lg:items-start">
-            <aside className="no-print flex flex-col gap-4 rounded-2xl border border-border bg-surface p-4">
-              <h2 className="text-base font-bold text-navy-900">Share this report</h2>
+          <div className="flex flex-col gap-5">
+            <ReportDashboard rows={dashboardRows} />
+
+            {/* Under both services' charts, spread across the full width. */}
+            <section
+              aria-labelledby="share-report-heading"
+              className="no-print grid grid-cols-1 gap-4 rounded-2xl border border-border bg-surface p-4 md:grid-cols-2 xl:grid-cols-3"
+            >
+              <h2 id="share-report-heading" className="text-base font-bold text-navy-900 md:col-span-2 xl:col-span-3">
+                Share this report
+              </h2>
               {activeProperty && (
                 <AdminReportDownload
                   propertyId={activeProperty.id}
@@ -120,7 +128,7 @@ export default async function AdminReportsPage({
                 />
               )}
               {activeProperty && activeClient && (
-                <div className="border-t border-divider pt-4">
+                <div className="border-t border-divider pt-4 md:border-l md:border-t-0 md:pl-4 md:pt-0">
                   {isEmailConfigured() ? (
                     <EmailReportButton
                       propertyId={activeProperty.id}
@@ -139,6 +147,7 @@ export default async function AdminReportsPage({
                   )}
                 </div>
               )}
+              <div className="flex flex-col gap-3 md:col-span-2 xl:col-span-1 xl:border-l xl:border-divider xl:pl-4">
               {flaggedRows.length > 0 && (
                 <Link
                   href="/admin/review"
@@ -156,16 +165,21 @@ export default async function AdminReportsPage({
                 </Link>
               )}
               <ComingSoon label="Cost & tariffs" />
-            </aside>
-
-            <ReportDashboard rows={dashboardRows} />
+              </div>
+            </section>
           </div>
         )}
 
         {activeProperty && (
           <section className="flex flex-col gap-3">
             <h2 className="no-print text-lg font-extrabold text-navy-900">Find readings</h2>
-            <ReportControls hasResults={rows.length > 0} latestMonth={latestMonthWithReadings} />
+            <ReportControls
+              hasResults={rows.length > 0}
+              latestMonth={latestMonthWithReadings}
+              propertyId={activeProperty.id}
+              propertyName={activeProperty.name}
+              clientName={activeClient?.name ?? null}
+            />
             <ReadingsTable rows={rows} />
           </section>
         )}

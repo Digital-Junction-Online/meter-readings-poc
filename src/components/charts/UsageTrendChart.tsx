@@ -144,6 +144,9 @@ export function UsageTrendChart({
     const plotRight = plot?.width != null ? plotLeft + plot.width : null;
     let left = centre - w / 2;
     if (plotRight !== null) left = Math.min(left, plotRight - w);
+    // The area chart's labels don't get the plot area, but its last point always
+    // sits on the right edge, so end the pill just past that point instead.
+    else left = centre - w + 6;
     left = Math.max(left, plotLeft);
     const textX = left + w / 2;
 

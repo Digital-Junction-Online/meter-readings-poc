@@ -4,6 +4,8 @@ import { useState, useTransition } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import type { Service } from "@/lib/types";
 import { DownloadIcon, SearchIcon, XIcon } from "@/components/icons";
+import { buildAdminReportOptions } from "@/components/AdminReportDownload";
+import { downloadReadingsPdf } from "@/lib/readingsPdf";
 
 const inputClass =
   "rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 outline-none transition-colors focus:border-navy-700 focus:bg-white focus:ring-2 focus:ring-navy-700/20";
@@ -11,15 +13,49 @@ const inputClass =
 export function ReportControls({
   hasResults,
   latestMonth,
+  propertyId,
+  propertyName,
+  clientName,
 }: {
   hasResults: boolean;
   /** "2026-10" — the newest month with readings, for the period shortcuts. */
   latestMonth?: string | null;
+  propertyId: string;
+  propertyName: string;
+  clientName: string | null;
 }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
+  const [preparing, setPreparing] = useState(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
+
+  /** Same branded PDF as "Share this report", limited to the applied filters. */
+  async function handleDownloadPdf() {
+    setPdfError(null);
+    setPreparing(true);
+    try {
+      const opts = await buildAdminReportOptions({
+        scope: "one",
+        propertyId,
+        propertyName,
+        clientName,
+        // The applied filters (what the table shows), not unsaved edits in the boxes.
+        filters: {
+          from: searchParams.get("from") ?? undefined,
+          to: searchParams.get("to") ?? undefined,
+          unit: searchParams.get("unit") ?? undefined,
+          service: searchParams.get("service") ?? undefined,
+        },
+      });
+      await downloadReadingsPdf(opts);
+    } catch {
+      setPdfError("We couldn't create the PDF. Please try again.");
+    } finally {
+      setPreparing(false);
+    }
+  }
 
   const [from, setFrom] = useState(searchParams.get("from") ?? "");
   const [to, setTo] = useState(searchParams.get("to") ?? "");
@@ -192,14 +228,20 @@ export function ReportControls({
         {hasResults && (
           <button
             type="button"
-            onClick={() => window.print()}
-            className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-navy-700 px-4 py-2 text-sm font-semibold text-navy-700 transition-colors hover:bg-[#e8eef7] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy-700"
+            onClick={handleDownloadPdf}
+            disabled={preparing}
+            className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-navy-700 px-4 py-2 text-sm font-semibold text-navy-700 transition-colors hover:bg-[#e8eef7] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy-700 disabled:opacity-60"
           >
             <DownloadIcon className="h-4 w-4" />
-            Download PDF
+            {preparing ? "Preparing PDF…" : "Download PDF"}
           </button>
         )}
       </div>
+      {pdfError && (
+        <p role="alert" className="text-sm font-medium text-red-600">
+          {pdfError}
+        </p>
+      )}
     </form>
   );
 }
