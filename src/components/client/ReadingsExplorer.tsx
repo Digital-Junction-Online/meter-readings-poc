@@ -5,7 +5,8 @@ import type { ReadingRow } from "@/components/ReadingsTable";
 import { ReadingDetailModal } from "@/components/ReadingDetailModal";
 import { BoltIcon, DownloadIcon, DropletIcon, SearchIcon, XIcon } from "@/components/icons";
 import { TONE_CLASS } from "@/lib/flagDisplay";
-import { downloadReadingsPdf } from "@/lib/readingsPdf";
+import { downloadReadingsPdf, shareReadingsPdf } from "@/lib/readingsPdf";
+import { ShareIcon } from "@/components/icons";
 import {
   clientStatus,
   filterReadings,
@@ -58,8 +59,9 @@ export function ReadingsExplorer({
   const [sort, setSort] = useState<SortKey>("unit-asc");
   const [visible, setVisible] = useState(PAGE_SIZE);
   const [openId, setOpenId] = useState<string | null>(null);
-  const [preparing, setPreparing] = useState(false);
+  const [preparing, setPreparing] = useState<"download" | "share" | null>(null);
   const [pdfError, setPdfError] = useState<string | null>(null);
+  const [pdfNote, setPdfNote] = useState<string | null>(null);
   // The list stays hidden until the client asks for something — a full
   // property's readings is a long scroll that buries what they came for.
   const [showList, setShowList] = useState(initialQuery !== "");
@@ -82,24 +84,30 @@ export function ReadingsExplorer({
     setShowList(true);
   }
 
-  async function handleDownload() {
+  async function handlePdf(action: "download" | "share") {
     setPdfError(null);
-    setPreparing(true);
+    setPdfNote(null);
+    setPreparing(action);
     try {
       const filterParts: string[] = [];
       if (query.trim()) filterParts.push(`Unit "${query.trim()}"`);
       if (service !== "all") filterParts.push(SERVICE_LABEL[service]);
-      await downloadReadingsPdf({
+      const opts = {
         preparedFor: clientName || propertyName,
         scopeLabel: propertyName,
         periodText: period_,
         filterText: filterParts.length > 0 ? filterParts.join(" · ") : null,
         sections: [{ propertyName, rows: results, chartRows: rows, openIssueIds: openIds }],
-      });
+      };
+      if (action === "download") {
+        await downloadReadingsPdf(opts);
+      } else if ((await shareReadingsPdf(opts)) === "downloaded") {
+        setPdfNote("This browser can't share files, so we saved the PDF instead. Attach it to an email or WhatsApp.");
+      }
     } catch {
       setPdfError("We couldn't create the report. Please try again.");
     } finally {
-      setPreparing(false);
+      setPreparing(null);
     }
   }
 
@@ -126,17 +134,29 @@ export function ReadingsExplorer({
             {formatNumber(results.length)} reading{results.length === 1 ? "" : "s"} · {period_}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={handleDownload}
-          disabled={preparing || results.length === 0}
-          className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-navy-700 px-5 py-2.5 text-[15px] font-bold text-white transition-colors hover:bg-navy-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy-700 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <DownloadIcon className="h-4 w-4" />
-          {preparing ? "Preparing report…" : "Download report"}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => handlePdf("share")}
+            disabled={preparing !== null || results.length === 0}
+            className="inline-flex min-h-12 items-center gap-2 rounded-xl border-[1.5px] border-navy-700 bg-surface px-5 py-2.5 text-[15px] font-bold text-navy-700 transition-colors hover:bg-[#e8eef7] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <ShareIcon className="h-4 w-4" />
+            {preparing === "share" ? "Preparing…" : "Share"}
+          </button>
+          <button
+            type="button"
+            onClick={() => handlePdf("download")}
+            disabled={preparing !== null || results.length === 0}
+            className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-navy-700 px-5 py-2.5 text-[15px] font-bold text-white transition-colors hover:bg-navy-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <DownloadIcon className="h-4 w-4" />
+            {preparing === "download" ? "Preparing report…" : "Download report"}
+          </button>
+        </div>
       </div>
       {pdfError && <p className="text-sm text-red-700">{pdfError}</p>}
+      {pdfNote && <p role="status" className="text-sm text-[#2e6b1d]">{pdfNote}</p>}
 
       <div className="flex flex-col gap-2 rounded-2xl border border-border bg-white p-3 sm:flex-row sm:items-center">
         <label className="relative min-w-0 flex-1">

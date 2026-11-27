@@ -395,7 +395,16 @@ async function drawSection(doc: Doc, startY: number, section: ReportSection, sho
   doc.text("Readings", MARGIN, y);
   y += 8;
 
-  const body = section.rows.map((r) => {
+  // Unit order (101, 102 … 110, not 101, 110, 102), then service, then newest
+  // first, so each unit's readings sit together like the property's unit list.
+  const tableRows = [...section.rows].sort(
+    (a, b) =>
+      a.unit_number.localeCompare(b.unit_number, undefined, { numeric: true, sensitivity: "base" }) ||
+      a.service.localeCompare(b.service) ||
+      b.captured_at.localeCompare(a.captured_at)
+  );
+
+  const body = tableRows.map((r) => {
     const known = isService(r.service);
     const unit = known ? SERVICE_UNIT[r.service as Service] : "";
     const label = known ? SERVICE_LABEL[r.service as Service] : r.service;
@@ -448,7 +457,7 @@ async function drawSection(doc: Doc, startY: number, section: ReportSection, sho
       showHead: "everyPage",
       didParseCell: (data) => {
         if (data.section !== "body") return;
-        const row = section.rows[data.row.index];
+        const row = tableRows[data.row.index];
         if (data.column.index === 2 && isService(row.service)) {
           data.cell.styles.textColor = row.service === "water" ? BLUE : AMBER_TEXT;
         }
@@ -464,7 +473,7 @@ async function drawSection(doc: Doc, startY: number, section: ReportSection, sho
 
   // Notices: what's being checked and which meters were swapped.
   const notices: string[] = [];
-  for (const r of section.rows) {
+  for (const r of tableRows) {
     if (r.kind === "replacement" && r.replacementDetail) {
       notices.push(
         `${unitTitle(r.unit_number)} ${SERVICE_LABEL[r.service as Service]?.toLowerCase() ?? ""} meter replaced on ${formatDay(r.captured_at)}: old meter closed at ${formatNumber(r.replacementDetail.closingValue)}, new meter opened at ${formatNumber(r.replacementDetail.openingValue)}.`
@@ -565,8 +574,41 @@ export async function buildReadingsPdf(opts: ReportPdfOptions): Promise<Doc> {
   return doc;
 }
 
+function pdfFileName(opts: ReportPdfOptions): string {
+  return `${slug(opts.scopeLabel)}-meter-report-${todaySA()}.pdf`;
+}
+
 /** Builds the report and saves it to the device. */
 export async function downloadReadingsPdf(opts: ReportPdfOptions): Promise<void> {
   const doc = await buildReadingsPdf(opts);
-  doc.save(`${slug(opts.scopeLabel)}-meter-report-${todaySA()}.pdf`);
+  doc.save(pdfFileName(opts));
+}
+
+export type ShareResult = "shared" | "cancelled" | "downloaded";
+
+/**
+ * Builds the report and hands it to the device's share sheet (WhatsApp,
+ * email, Teams…) as a PDF attachment. Where the browser can't share files,
+ * it saves the PDF instead so there's still something to send.
+ */
+export async function shareReadingsPdf(opts: ReportPdfOptions): Promise<ShareResult> {
+  const doc = await buildReadingsPdf(opts);
+  const name = pdfFileName(opts);
+  const file = new File([doc.output("blob")], name, { type: "application/pdf" });
+  const payload: ShareData = {
+    files: [file],
+    title: `Meter readings report: ${opts.scopeLabel}`,
+    text: `Meter readings report for ${opts.scopeLabel} (${opts.periodText}).`,
+  };
+  if (typeof navigator !== "undefined" && typeof navigator.share === "function" && navigator.canShare?.(payload)) {
+    try {
+      await navigator.share(payload);
+      return "shared";
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return "cancelled";
+      // Anything else (no share target, permissions): fall back to saving.
+    }
+  }
+  doc.save(name);
+  return "downloaded";
 }

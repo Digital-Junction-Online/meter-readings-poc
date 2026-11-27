@@ -151,7 +151,9 @@ function UtilityDashboard({ service, rows }: { service: Service; rows: ReadingRo
   const trendExplanation = explainTrend(rows, trendData, meta.unit);
 
   return (
-    <div className="flex flex-col gap-3">
+    // On wide screens each service is a column on a shared 3-row subgrid, so the
+    // headers, status panels and per-month charts line up across the two.
+    <div className="flex min-w-0 flex-col gap-3 lg:row-span-3 lg:grid lg:grid-rows-subgrid">
       <div className="flex items-center gap-2">
         <span
           className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${meta.softBg}`}
@@ -168,7 +170,7 @@ function UtilityDashboard({ service, rows }: { service: Service; rows: ReadingRo
         </span>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)]">
+      <div className="contents">
         <Panel title="Reading status breakdown">
           <div className="flex items-center gap-3">
             <StatusArc
@@ -206,7 +208,7 @@ function UtilityDashboard({ service, rows }: { service: Service; rows: ReadingRo
           </p>
         </Panel>
 
-        <div className="flex flex-col gap-2 rounded-2xl bg-navy-900 p-4 text-white sm:col-span-2 lg:col-span-1">
+        <div className="flex flex-col gap-2 rounded-2xl bg-navy-900 p-4 text-white">
           <div className="flex items-baseline justify-between gap-3">
             <p className="text-[15px] font-bold">{meta.label} per month</p>
             <span className="text-xs font-semibold text-white/60">{meta.unit}</span>
@@ -268,7 +270,7 @@ export function ReportDashboard({ rows }: { rows: ReadingRow[] }) {
   if (readingRows.length === 0) return null;
 
   return (
-    <div className="no-print flex flex-col gap-6">
+    <div className="no-print flex flex-col gap-6 lg:grid lg:grid-cols-2 lg:gap-x-5 lg:gap-y-3">
       <UtilityDashboard service="electricity" rows={readingRows.filter((r) => r.service === "electricity")} />
       <UtilityDashboard service="water" rows={readingRows.filter((r) => r.service === "water")} />
     </div>
